@@ -28,7 +28,7 @@ impl Config {
 }
 
 pub fn run(config : Config) -> Result<(), Box<Error>> {
-    let solids = model_file::ascii_stl::load(config.input_fh()?)?;
+    let solids = model_file::load(config.input_fh()?)?;
     println!("num solids {}", solids.len());
 
     let mut sum = 0;

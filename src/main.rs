@@ -13,7 +13,7 @@ fn main() {
         });
 
     if let Err(e) = narsil::run(config) {
-        println!("Error: {}", e);
+        println!("Error: {}", e.description());
         process::exit(1);
     }
 }
