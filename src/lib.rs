@@ -2,7 +2,10 @@
 extern crate lazy_static;
 extern crate regex;
 
-use std::error::Error;
+#[macro_use]
+extern crate failure;
+
+use failure::Error;
 use std::fs::File;
 
 mod model_file;
@@ -27,7 +30,7 @@ impl Config {
     }
 }
 
-pub fn run(config : Config) -> Result<(), Box<Error>> {
+pub fn run(config : Config) -> Result<(), Error> {
     let solids = model_file::load(config.input_fh()?)?;
     println!("num solids {}", solids.len());
 

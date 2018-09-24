@@ -6,96 +6,17 @@ use std::io::prelude::*;
 use std::fs::File;
 use std::io::SeekFrom;
 use std::io;
-use std::error;
-use std::fmt;
 
-pub struct UnknownFileError;
-
-impl error::Error for UnknownFileError {
-    fn description(&self) -> &str {
-        "Unknown file format"
-    }
-}
-
-impl fmt::Debug for UnknownFileError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", error::Error::description(self))
-    }
-}
-
-impl fmt::Display for UnknownFileError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", error::Error::description(self))
-    }
-}
-
-pub struct BinaryParseError;
-
-impl fmt::Debug for BinaryParseError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", error::Error::description(self))
-    }
-}
-
-impl fmt::Display for BinaryParseError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", error::Error::description(self))
-    }
-}
-
-impl error::Error for BinaryParseError {
-    fn description(&self) -> &str {
-        "Binary STL not supported yet"
-    }
-}
-
+#[derive(Fail, Debug)]
 pub enum ModelError {
-    IO(io::Error),
-    AsciiParse(ascii_stl::StlError),
-    BinaryParse(BinaryParseError),
-    Unknown(UnknownFileError)
-}
-
-impl From<BinaryParseError> for  ModelError {
-    fn from(error: BinaryParseError) -> Self {
-        ModelError::BinaryParse(error)
-    }
-}
-
-
-impl fmt::Debug for ModelError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", error::Error::description(self))
-    }
-}
-
-impl fmt::Display for ModelError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", error::Error::description(self))
-    }
-}
-
-impl error::Error for ModelError {
-    fn description(&self) -> &str {
-        match *self {
-            ModelError::IO(ref e) => e.description(),
-            ModelError::AsciiParse(ref e) => e.description(),
-            ModelError::BinaryParse(ref e) => e.description(),
-            ModelError::Unknown(ref e) => e.description()
-        }
-    }
-
-    fn cause(&self) -> Option<&error::Error> {
-        match *self {
-            ModelError::IO(ref e) => Some(e),
-            ModelError::AsciiParse(ref stl_e) => match stl_e {
-                ascii_stl::StlError::IO(ref e) => Some(e),
-                _ => Some(stl_e)
-            },
-            ModelError::BinaryParse(ref e) => Some(e),
-            ModelError::Unknown(ref e) => Some(e)
-        }
-    }
+    #[fail(display = "{}", _0)]
+    IO(#[fail(cause)] io::Error),
+    #[fail(display = "{}", _0)]
+    AsciiParse(#[fail(cause)] ascii_stl::StlError),
+    #[fail(display = "Binary STL not supported yet")]
+    BinaryParse,
+    #[fail(display = "Unknown file format")]
+    Unknown
 }
 
 enum FileType {
@@ -129,8 +50,8 @@ pub fn load(mut fh : File) -> ModelResult<data::Surfaces> {
 
     let result = match file_type {
         FileType::AsciiStl => ascii_stl::load(fh).map_err(ModelError::AsciiParse)?,
-        FileType::BinaryStl => return Err(ModelError::BinaryParse(BinaryParseError)),
-        FileType::Unknown => return Err(ModelError::Unknown(UnknownFileError))
+        FileType::BinaryStl => return Err(ModelError::BinaryParse),
+        FileType::Unknown => return Err(ModelError::Unknown)
     };
     Ok(result)
 } 
