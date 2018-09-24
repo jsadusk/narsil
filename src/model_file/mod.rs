@@ -1,4 +1,5 @@
 pub mod ascii_stl;
+pub mod binary_stl;
 pub mod data;
 
 use std::result::Result;
@@ -13,8 +14,8 @@ pub enum ModelError {
     IO(#[fail(cause)] io::Error),
     #[fail(display = "{}", _0)]
     AsciiParse(#[fail(cause)] ascii_stl::StlError),
-    #[fail(display = "Binary STL not supported yet")]
-    BinaryParse,
+    #[fail(display = "{}", _0)]
+    BinaryParse(#[fail(cause)] binary_stl::StlError),
     #[fail(display = "Unknown file format")]
     Unknown
 }
@@ -50,7 +51,7 @@ pub fn load(mut fh : File) -> ModelResult<data::Surfaces> {
 
     let result = match file_type {
         FileType::AsciiStl => ascii_stl::load(fh).map_err(ModelError::AsciiParse)?,
-        FileType::BinaryStl => return Err(ModelError::BinaryParse),
+        FileType::BinaryStl => binary_stl::load(fh).map_err(ModelError::BinaryParse)?,
         FileType::Unknown => return Err(ModelError::Unknown)
     };
     Ok(result)
