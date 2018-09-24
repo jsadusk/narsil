@@ -23,6 +23,12 @@ pub enum StlError {
     IO(#[fail(cause)] io::Error)
 }
 
+impl From<io::Error> for StlError {
+    fn from(error : io::Error) -> Self {
+        StlError::IO(error)
+    }
+}
+
 type StlResult<T> = Result<T, StlError>;
 
 enum STLParseState {
@@ -61,7 +67,7 @@ pub fn load(fh : File) -> StlResult<Surfaces> {
     let mut state = STLParseState::Top;
 
     for line in reader.lines() {
-        let line = line.map_err(StlError::IO)?;
+        let line = line?;
         let line_str = line.as_str();
 
         match state {
