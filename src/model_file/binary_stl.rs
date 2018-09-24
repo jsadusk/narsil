@@ -22,7 +22,7 @@ impl From<io::Error> for StlError {
     }
 }
 
-fn read_point(buf : &[u8]) -> Point {
+fn read_vertex(buf : &[u8]) -> Vertex {
     let elem_size = 4;
     let x : f64 = LittleEndian::read_f32(&buf[0..elem_size]) as f64;
     let y : f64 = LittleEndian::read_f32(&buf[elem_size..elem_size * 2]) as f64;
@@ -31,18 +31,18 @@ fn read_point(buf : &[u8]) -> Point {
     [x, y, z]
 }
 
-fn read_triangle(buf : &[u8]) -> Triangle {
-    let point_size = 12;
-    let a = read_point(&buf[0..point_size]);
-    let b = read_point(&buf[point_size..point_size * 2]);
-    let c = read_point(&buf[point_size * 2..point_size * 3]);
+fn read_triangle(buf : &[u8]) -> FreeTriangle {
+    let vertex_size = 12;
+    let a = read_vertex(&buf[0..vertex_size]);
+    let b = read_vertex(&buf[vertex_size..vertex_size * 2]);
+    let c = read_vertex(&buf[vertex_size * 2..vertex_size * 3]);
 
     [a, b, c]
 }
 
 type StlResult<T> = Result<T, StlError>;
 
-pub fn load(mut fh : File) -> StlResult<Surfaces> {
+pub fn load(mut fh : File) -> StlResult<FreeSurface> {
     let mut header_buf = [0u8; 80];
     let num = fh.read(&mut header_buf)?;
 
@@ -60,7 +60,7 @@ pub fn load(mut fh : File) -> StlResult<Surfaces> {
     let expected_triangle_bytes = TRIANGLE_SIZE * num_triangles;
     let mut bytes_so_far = 0;
 
-    let mut surface = Surface::new();
+    let mut surface = FreeSurface::new();
     
     for _i in 0..num_triangles {
         let mut triangle_buf = [0u8; TRIANGLE_SIZE];
@@ -78,7 +78,5 @@ pub fn load(mut fh : File) -> StlResult<Surfaces> {
 
     let _attrib = fh.read_u16::<LittleEndian>()?;
     
-    let mut surfaces = Surfaces::new();
-    surfaces.push(surface);
-    Ok(surfaces)
+    Ok(surface)
 }

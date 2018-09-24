@@ -38,7 +38,7 @@ enum STLParseState {
     Loop
 }
 
-pub fn load(fh : File) -> StlResult<Surfaces> {
+pub fn load(fh : File) -> StlResult<FreeSurface> {
     lazy_static! {
         static ref SOLID_RE : Regex =
             Regex::new(r"solid ([^\s]+)$").unwrap();
@@ -59,10 +59,9 @@ pub fn load(fh : File) -> StlResult<Surfaces> {
     
     let reader = io::BufReader::new(&fh);
 
-    let mut surfaces = Surfaces::new();
-    let mut surface = Surface::new();
-    let mut surface_names : Vec<String> = Vec::new();
-    let mut triangle = Points::new();
+    let mut surface = FreeSurface::new();
+    let mut _surface_names : Vec<String> = Vec::new();
+    let mut triangle = Vertices::new();
     
     let mut state = STLParseState::Top;
 
@@ -72,10 +71,9 @@ pub fn load(fh : File) -> StlResult<Surfaces> {
 
         match state {
             STLParseState::Top => {
-                let cap = SOLID_RE.captures(line_str)
+                let _cap = SOLID_RE.captures(line_str)
                     .ok_or(StlError::Solid(line_str.to_string()))?;
                 
-                surface_names.push(cap[1].to_string());
                 state = STLParseState::Solid;
             },
             STLParseState::Solid => {
@@ -83,8 +81,6 @@ pub fn load(fh : File) -> StlResult<Surfaces> {
                     Some(_mat) => state = STLParseState::Facet,
                     None => match ENDSOLID_RE.find(line_str) {
                         Some(_mat) => {
-                            surfaces.push(surface);
-                            surface = Surface::new();
                             state = STLParseState::Top;
                         },
                         None => return Err(StlError::Facet(line_str.to_string()))
@@ -118,8 +114,8 @@ pub fn load(fh : File) -> StlResult<Surfaces> {
                             .map_err(|e| StlError::Float(e,
                                                          line_str.to_string()))?;
 
-                        let point = [x, y, z];
-                        triangle.push(point);
+                        let vertex = [x, y, z];
+                        triangle.push(vertex);
                     },
                     None => match ENDLOOP_RE.find(line_str) {
                         Some(_mat) => {
@@ -128,10 +124,10 @@ pub fn load(fh : File) -> StlResult<Surfaces> {
                                                           line_str.to_string()));
                             }
 
-                            let mut real_triangle = Triangle::new();
+                            let mut real_triangle = FreeTriangle::new();
                             
-                            for (i, point) in triangle.iter().enumerate() {
-                                real_triangle[i] = *point;
+                            for (i, vertex) in triangle.iter().enumerate() {
+                                real_triangle[i] = *vertex;
                             }
                             
                             surface.push(real_triangle);
@@ -145,5 +141,5 @@ pub fn load(fh : File) -> StlResult<Surfaces> {
         }
     }
 
-    Ok(surfaces)
+    Ok(surface)
 }

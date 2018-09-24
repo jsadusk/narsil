@@ -1,15 +1,16 @@
-pub type Point = [f64; 3];
-pub type Points = Vec<Point>;
-pub type Triangle = [Point; 3];
-pub type Surface = Vec<Triangle>;
-pub type Surfaces = Vec<Surface>;
+pub type Vertex = [f64; 3];
+pub type Vertices = Vec<Vertex>;
+pub type FreeTriangle = [Vertex; 3];
+pub type FreeSurface = Vec<FreeTriangle>;
+pub type IndexTriangle = [usize; 3];
+pub type Surface = Vec<IndexTriangle>;
 
 pub trait New<T> {
     fn new() -> T;
 }
 
-impl New<Triangle> for Triangle {
-    fn new() -> Triangle {
+impl New<FreeTriangle> for FreeTriangle {
+    fn new() -> FreeTriangle {
         [[0.0; 3]; 3]
     }
 }

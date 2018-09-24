@@ -46,7 +46,7 @@ fn identify(fh : &mut File) -> io::Result<FileType> {
 
 type ModelResult<T> = Result<T, ModelError>;
     
-pub fn load(mut fh : File) -> ModelResult<data::Surfaces> {
+pub fn load(mut fh : File) -> ModelResult<data::FreeSurface> {
     let file_type = identify(&mut fh).map_err(ModelError::IO)?;
 
     let result = match file_type {
