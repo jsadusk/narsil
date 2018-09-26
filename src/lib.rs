@@ -32,15 +32,10 @@ impl Config {
 }
 
 pub fn run(config : Config) -> Result<(), Error> {
-    let solids = model_file::load(config.input_fh()?)?;
-    println!("num solids {}", solids.len());
+    let (solid, vertices) = model_file::load(config.input_fh()?)?;
+    println!("num vertices {}", vertices.len());
 
-    let mut sum = 0;
-    for solid in solids {
-        sum += solid.len();
-    }
-
-    println!("num triangles {}", sum);
+    println!("num triangles {}", solid.len());
     
     Ok(())
 }

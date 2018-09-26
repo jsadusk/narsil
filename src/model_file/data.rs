@@ -14,3 +14,9 @@ impl New<FreeTriangle> for FreeTriangle {
         [[0.0; 3]; 3]
     }
 }
+
+impl New<IndexTriangle> for IndexTriangle {
+    fn new() -> IndexTriangle {
+        [0; 3]
+    }
+}
