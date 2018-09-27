@@ -10,6 +10,9 @@ use std::io;
 use std::collections::BTreeMap;
 use std::cmp::Ordering;
 use model_file::data::*;
+use hedge;
+use hedge::Mesh;
+use hedge::AddGeometry;
 
 #[derive(Fail, Debug)]
 pub enum ModelError {
@@ -154,15 +157,37 @@ fn identify(fh : &mut File) -> io::Result<FileType> {
     }
 }
 
+fn surface_to_mesh(surface : Surface, vertices : Vertices) -> Mesh {
+    let mut mesh = Mesh::new();
+
+    let mut vert_indices = Vec::new();
+
+    for mesh_vert in vertices.iter().map(
+        |vert| hedge::Vertex::from_point(hedge::Point {x : vert[0],
+                                                       y : vert[1],
+                                                       z : vert[2]})) {
+        vert_indices.push(mesh.add(mesh_vert));
+    }
+
+    for triangle in surface {
+        mesh.add(hedge::triangle::FromVerts(vert_indices[triangle[0]],
+                                            vert_indices[triangle[1]],
+                                            vert_indices[triangle[2]]));
+    }
+
+    mesh
+}
+
 type ModelResult<T> = Result<T, ModelError>;
     
-pub fn load(mut fh : File) -> ModelResult<(Surface, Vertices)> {
+pub fn load(mut fh : File) -> ModelResult<Mesh> {
     let file_type = identify(&mut fh).map_err(ModelError::IO)?;
 
-    let result = match file_type {
+    let (surface, vertices) = match file_type {
         FileType::AsciiStl => unify_vertices(ascii_stl::load(fh).map_err(ModelError::AsciiParse)?),
         FileType::BinaryStl => unify_vertices(binary_stl::load(fh).map_err(ModelError::BinaryParse)?),
         FileType::Unknown => return Err(ModelError::Unknown)
     };
-    Ok(result)
+
+    Ok(surface_to_mesh(surface, vertices))
 } 

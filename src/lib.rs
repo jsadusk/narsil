@@ -2,6 +2,7 @@
 extern crate lazy_static;
 extern crate regex;
 extern crate byteorder;
+extern crate hedge;
 
 #[macro_use]
 extern crate failure;
@@ -32,10 +33,8 @@ impl Config {
 }
 
 pub fn run(config : Config) -> Result<(), Error> {
-    let (solid, vertices) = model_file::load(config.input_fh()?)?;
-    println!("num vertices {}", vertices.len());
+    let mesh = model_file::load(config.input_fh()?)?;
+    println!("num triangles {}", mesh.faces().count());
 
-    println!("num triangles {}", solid.len());
-    
     Ok(())
 }
