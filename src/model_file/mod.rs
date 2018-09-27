@@ -157,25 +157,31 @@ fn identify(fh : &mut File) -> io::Result<FileType> {
     }
 }
 
-fn surface_to_mesh(surface : Surface, vertices : Vertices) -> Mesh {
-    let mut mesh = Mesh::new();
+trait FromSurface {
+    fn from_surface(surface : Surface, vertices : Vertices) -> Self;
+}
 
-    let mut vert_indices = Vec::new();
+impl FromSurface for Mesh {
+    fn from_surface(surface : Surface, vertices : Vertices) -> Self {
+        let mut mesh = Mesh::new();
 
-    for mesh_vert in vertices.iter().map(
-        |vert| hedge::Vertex::from_point(hedge::Point {x : vert[0],
-                                                       y : vert[1],
-                                                       z : vert[2]})) {
-        vert_indices.push(mesh.add(mesh_vert));
+        let mut vert_indices = Vec::new();
+
+        for mesh_vert in vertices.iter().map(
+            |vert| hedge::Vertex::from_point(hedge::Point {x : vert[0],
+                                                           y : vert[1],
+                                                           z : vert[2]})) {
+            vert_indices.push(mesh.add(mesh_vert));
+        }
+
+        for triangle in surface {
+            mesh.add(hedge::triangle::FromVerts(vert_indices[triangle[0]],
+                                                vert_indices[triangle[1]],
+                                                vert_indices[triangle[2]]));
+        }
+
+        mesh
     }
-
-    for triangle in surface {
-        mesh.add(hedge::triangle::FromVerts(vert_indices[triangle[0]],
-                                            vert_indices[triangle[1]],
-                                            vert_indices[triangle[2]]));
-    }
-
-    mesh
 }
 
 type ModelResult<T> = Result<T, ModelError>;
@@ -189,5 +195,5 @@ pub fn load(mut fh : File) -> ModelResult<Mesh> {
         FileType::Unknown => return Err(ModelError::Unknown)
     };
 
-    Ok(surface_to_mesh(surface, vertices))
-} 
+    Ok(Mesh::from_surface(surface, vertices))
+}
