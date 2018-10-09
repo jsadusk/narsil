@@ -8,4 +8,4 @@ regex = "1.0.0"
 lazy_static = "1.0.0"
 failure = "0.1"
 byteorder = "1.2.6"
-hedge = "0.0.11"
+hedge = { git = "ssh://git@sadusk.com/joe/hedge", branch = "hashable_index" }
