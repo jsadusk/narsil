@@ -11,6 +11,7 @@ use failure::Error;
 use std::fs::File;
 
 mod model_file;
+mod slicer;
 
 pub struct Config {
     input_filename : String,
@@ -36,5 +37,10 @@ pub fn run(config : Config) -> Result<(), Error> {
     let mesh = model_file::load(config.input_fh()?)?;
     println!("num triangles {}", mesh.faces().count());
 
+    let slice = slicer::slice(mesh)?;
+
+    for point in slice.iter() {
+        println!("Point {}, {}, {}", point[0], point[1], point[2]);
+    }
     Ok(())
 }
