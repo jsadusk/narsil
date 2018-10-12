@@ -46,7 +46,7 @@ impl SortableVertex {
 
 impl Ord for SortableVertex {
     fn cmp(&self, other: &SortableVertex) -> Ordering {
-        for i in 0..2 {
+        for i in 0..3 {
             if (self.data[i] - other.data[i]).abs() > self.epsilon {
                 if self.data[i] < other.data[i] {
                     return Ordering::Less;
