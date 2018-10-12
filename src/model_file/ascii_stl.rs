@@ -41,14 +41,14 @@ enum STLParseState {
 pub fn load(fh : File) -> StlResult<FreeSurface> {
     lazy_static! {
         static ref SOLID_RE : Regex =
-            Regex::new(r"solid ([^\s]+)$").unwrap();
+            Regex::new(r"solid (.+)$").unwrap();
         static ref FACET_RE : Regex =
-            Regex::new(r"\s*facet normal ([0-9e.-]+) ([0-9e.-]+) ([0-9e.-]+)$")
+            Regex::new(r"\s*facet\s+normal\s+([0-9e.+-]+)\s+([0-9e.+-]+)\s+([0-9e.+-]+)$")
             .unwrap();
         static ref LOOP_RE : Regex
             = Regex::new(r"\s*outer loop$").unwrap();
         static ref VERTEX_RE : Regex =
-            Regex::new(r"\s*vertex ([0-9.-]+) ([0-9.-]+) ([0-9.-]+)$").unwrap();
+            Regex::new(r"\s*vertex\s+([0-9e.+-]+)\s+([0-9e.+-]+)\s+([0-9e.+-]+)$").unwrap();
         static ref ENDLOOP_RE :Regex
             = Regex::new(r"\s*endloop$").unwrap();
         static ref ENDFACET_RE : Regex
