@@ -28,7 +28,7 @@ pub enum ModelError {
 
 
 fn dist_sq(a : &Vertex, b : &Vertex) -> f64 {
-    (b[0] - a[0]).powi(2) + (b[1] - a[1]).powi(2) + (b[2] - b[2]).powi(2)
+    ((*b)[0] - (*a)[0]).powi(2) + ((*b)[1] - (*a)[1]).powi(2) + ((*b)[2] - (*a)[2]).powi(2)
 }
 
 const EPS_FACTOR : f64 = 0.000001;
