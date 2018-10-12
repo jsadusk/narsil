@@ -189,11 +189,13 @@ type ModelResult<T> = Result<T, ModelError>;
 pub fn load(mut fh : File) -> ModelResult<Mesh> {
     let file_type = identify(&mut fh).map_err(ModelError::IO)?;
 
-    let (surface, vertices) = match file_type {
-        FileType::AsciiStl => unify_vertices(ascii_stl::load(fh).map_err(ModelError::AsciiParse)?),
-        FileType::BinaryStl => unify_vertices(binary_stl::load(fh).map_err(ModelError::BinaryParse)?),
+    let free_mesh = match file_type {
+        FileType::AsciiStl => ascii_stl::load(fh).map_err(ModelError::AsciiParse)?,
+        FileType::BinaryStl => binary_stl::load(fh).map_err(ModelError::BinaryParse)?,
         FileType::Unknown => return Err(ModelError::Unknown)
     };
+
+    let (surface, vertices) = unify_vertices(free_mesh);
 
     Ok(Mesh::from_surface(surface, vertices))
 }
