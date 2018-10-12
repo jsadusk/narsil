@@ -86,13 +86,15 @@ fn slice_face(position : f64, mesh : &Mesh, face_index : FaceIndex) -> (Segment,
 fn slice_layer(position : f64, mesh : &Mesh, starting_face : FaceIndex) -> Polygon {
     let mut slice = Polygon::new();
 
-    let (seg, next_face) = slice_face(position, &mesh, starting_face);
+    let (mut seg, mut next_face) = slice_face(position, &mesh, starting_face);
     slice.push(seg.0);
     slice.push(seg.1);
 
     while next_face != starting_face {
         let cur_face = next_face;
-        let (seg, next_face) = slice_face(position, &mesh, cur_face);
+        let (new_seg, new_next_face) = slice_face(position, &mesh, cur_face);
+        seg = new_seg;
+        next_face = new_next_face;
         if seg.0 == *slice.last().unwrap() {
             slice.push(seg.1);
         }
