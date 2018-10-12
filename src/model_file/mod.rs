@@ -93,24 +93,39 @@ fn unify_vertices(orig : FreeSurface) -> (Surface, Vertices) {
     //something to start
     let mut min_edge_len_sq = dist_sq(&orig[0][0], &orig[0][1]);
 
-    for triangle in orig.iter() {
+    for (i, triangle) in orig.iter().enumerate() {
         let edge_len_sq = dist_sq(&triangle[0], &triangle[1]);
+        if edge_len_sq == 0.0 {
+            panic!("Degenerate 0 {} edge {},{},{} {},{},{}", i,
+                   triangle[0][0], triangle[0][1], triangle[0][2],
+                   triangle[1][0], triangle[1][1], triangle[1][2]);
+        }
         if edge_len_sq < min_edge_len_sq {
             min_edge_len_sq = edge_len_sq;
         }
 
         let edge_len_sq = dist_sq(&triangle[1], &triangle[2]);
+        if edge_len_sq == 0.0 {
+            panic!("Degenerate 1 {} edge {},{},{} {},{},{}", i,
+                   triangle[1][0], triangle[1][1], triangle[1][2],
+                   triangle[2][0], triangle[2][1], triangle[2][2]);
+        }
         if edge_len_sq < min_edge_len_sq {
             min_edge_len_sq = edge_len_sq;
         }
 
         let edge_len_sq = dist_sq(&triangle[2], &triangle[0]);
+        if edge_len_sq == 0.0 {
+            panic!("Degenerate 2 {} edge {},{},{} {},{},{}", i,
+                   triangle[0][0], triangle[0][1], triangle[0][2],
+                   triangle[2][0], triangle[2][1], triangle[2][2]);
+        }
         if edge_len_sq < min_edge_len_sq {
             min_edge_len_sq = edge_len_sq;
         }
     }
 
-    let epsilon = min_edge_len_sq.sqrt() / EPS_FACTOR;
+    let epsilon = min_edge_len_sq.sqrt() * EPS_FACTOR;
 
     let mut vertices = Vertices::new();
     let mut surface = Surface::new();
