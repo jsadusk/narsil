@@ -38,7 +38,7 @@ fn z_range(mesh : &Mesh, face : &Face) -> Range {
     Range {lower, upper}
 }
 
-type Polygon = Vec<Point>;
+pub type Polygon = Vec<Point>;
 struct Segment(Point, Point);
 
 impl Segment {

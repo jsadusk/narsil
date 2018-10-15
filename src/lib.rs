@@ -3,34 +3,82 @@ extern crate lazy_static;
 extern crate regex;
 extern crate byteorder;
 extern crate hedge;
+extern crate svg;
 
 #[macro_use]
 extern crate failure;
 
 use failure::Error;
 use std::fs::File;
+use std::f64;
+
+use svg::Document;
+use svg::node::element::Path;
+use svg::node::element::path;
 
 mod model_file;
 mod slicer;
 
+use slicer::Polygon;
+
 pub struct Config {
     input_filename : String,
+    output_filename : String
 }
 
 impl Config {
-    pub fn new(args: &Vec<String>) -> Result<Config, &'static str> {
-        if args.len() < 2 {
-            Err("Filename missing")
+    pub fn new(args: &Vec<String>) -> Result<Config, String> {
+        if args.len() < 3 {
+            Err(format!("Usage: {} <input_file> <output_file>", args[0]))
         }
         else {
-            let input_filename = args[1].clone();
-            Ok(Config { input_filename})
+            Ok(Config { input_filename: args[1].clone(),
+                        output_filename: args[2].clone()})
         }
     }
 
-    pub fn input_fh(self) -> Result<File, std::io::Error> {
-        File::open(self.input_filename)
+    pub fn input_fh(&self) -> Result<File, std::io::Error> {
+        File::open(self.input_filename.clone())
     }
+
+    pub fn output_fh(&self) -> Result<File, std::io::Error> {
+        File::create(self.output_filename.clone())
+    }
+}
+
+pub fn write_svg(fh : File, slice : Polygon, factor: f64) -> Result<(), std::io::Error> {
+    let mut minx = f64::INFINITY;
+    let mut miny = f64::INFINITY;
+    
+    for point in slice.iter() {
+        if point[0] < minx {
+            minx = point[0];
+        }
+        if point[1] < miny {
+            miny = point[0];
+        }
+    }
+
+    let mut data = path::Data::new()
+        .move_to(((slice[0][0] - minx) * factor,
+                  (slice[0][1] - miny) * factor));
+
+    for point in slice.iter().skip(1) {
+        data = data.line_to(((point[0] - minx) * factor,
+                             (point[1] - miny) * factor));
+    }
+
+    data = data.close();
+
+    let path = Path::new()
+        .set("fill", "none")
+        .set("stroke", "black")
+        .set("stroke-width", 2)
+        .set("d", data);
+
+    let document = Document::new().add(path);
+
+    svg::write(fh, &document)
 }
 
 pub fn run(config : Config) -> Result<(), Error> {
@@ -38,9 +86,7 @@ pub fn run(config : Config) -> Result<(), Error> {
     println!("num triangles {}", mesh.faces().count());
 
     let slice = slicer::slice(mesh)?;
-
-    for point in slice.iter() {
-        println!("Point {}, {}, {}", point[0], point[1], point[2]);
-    }
+    write_svg(config.output_fh()?, slice, 100.0);
+    
     Ok(())
 }
