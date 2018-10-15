@@ -15,7 +15,12 @@ type SlicerResult<T> = Result<T, SlicerError>;
 
 struct FaceAttrib {
     seen : bool,
-    index : FaceIndex
+}
+
+impl FaceAttrib {
+    fn new() -> FaceAttrib {
+        FaceAttrib { seen : false }
+    }
 }
 
 struct Range {
@@ -39,7 +44,9 @@ fn z_range(mesh : &Mesh, face : &Face) -> Range {
 }
 
 pub type Polygon = Vec<Point>;
+pub type Layer = Vec<Polygon>;
 struct Segment(Point, Point);
+type FaceList = Vec<FaceIndex>;
 
 impl Segment {
     fn new() -> Self {
@@ -48,10 +55,10 @@ impl Segment {
     }
 }
 
-fn slice_face(position : f64, mesh : &Mesh, face_index : FaceIndex) -> (Segment, FaceIndex) {
-    let face = &mesh.face(face_index);
+fn slice_face(position : f64, mesh : &Mesh, face_index : &FaceIndex) -> (Segment, FaceIndex) {
+    let face = &mesh.face(*face_index);
     let mut seg = Segment::new();
-    let mut next = face_index;
+    let mut next = *face_index;
     
     for edge_index in mesh.edges(face) {
         let edge = &mesh.edge(edge_index);
@@ -83,42 +90,60 @@ fn slice_face(position : f64, mesh : &Mesh, face_index : FaceIndex) -> (Segment,
     (seg, next)
 }
 
-fn slice_layer(position : f64, mesh : &Mesh, starting_face : FaceIndex) -> Polygon {
-    let mut slice = Polygon::new();
-
-    let (mut seg, mut next_face) = slice_face(position, &mesh, starting_face);
-    slice.push(seg.0);
-    slice.push(seg.1);
-
-    while next_face != starting_face {
-        let cur_face = next_face;
-        let (new_seg, new_next_face) = slice_face(position, &mesh, cur_face);
-        seg = new_seg;
-        next_face = new_next_face;
-        if seg.0 == *slice.last().unwrap() {
-            slice.push(seg.1);
-        }
+fn slice_layer(position : f64, mesh : &Mesh, starting_faces : FaceList) -> Layer {
+    let mut attrib = HashMap::new();
+    for face in starting_faces.iter() {
+        attrib.insert(face.clone(), FaceAttrib::new());
     }
 
-    slice
+    let mut starting_index : usize = 0;
+    let mut layer = Layer::new();
+    while starting_index < starting_faces.len() {
+        while starting_index < starting_faces.len() &&
+              attrib.get(&starting_faces[starting_index]).unwrap().seen {
+                  starting_index += 1;
+              }
+        if starting_index == starting_faces.len() {
+            break;
+        }
+
+        let mut slice = Polygon::new();
+        let starting_face = &starting_faces[starting_index];
+        
+        let (mut seg, mut next_face) = slice_face(position, &mesh, &starting_face);
+        slice.push(seg.0);
+        slice.push(seg.1);
+        attrib.get_mut(starting_face).unwrap().seen = true;
+        
+        while next_face != *starting_face {
+            let cur_face = next_face;
+            let (new_seg, new_next_face) = slice_face(position, &mesh, &cur_face);
+            seg = new_seg;
+            next_face = new_next_face;
+            if seg.0 == *slice.last().unwrap() {
+                slice.push(seg.1);
+            }
+            attrib.get_mut(&cur_face).unwrap().seen = true;
+        }
+
+        layer.push(slice);
+    }
+
+    layer
 }
 
-pub fn slice(mesh : Mesh) -> SlicerResult<Polygon>{
-    let mut attribs = HashMap::new();
-
-    for index in mesh.faces() {
-        attribs.insert(index, FaceAttrib {seen: false, index: index});
-    }
-
+pub fn slice(mesh : Mesh) -> SlicerResult<Layer>{
     let layer_position = 0.1;
 
+    let mut valid_faces = FaceList::new();
+    
     for index in mesh.faces() {
         let face = &mesh.face(index);
         let range =  z_range(&mesh, face);
         if range.lower < layer_position && range.upper > layer_position {
-            return Ok(slice_layer(layer_position, &mesh, index));
+            valid_faces.push(index.clone());
         }
     }
 
-    Ok(Polygon::new())
+    Ok(slice_layer(layer_position, &mesh, valid_faces))
 }

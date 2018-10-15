@@ -19,7 +19,7 @@ use svg::node::element::path;
 mod model_file;
 mod slicer;
 
-use slicer::Polygon;
+use slicer::Layer;
 
 pub struct Config {
     input_filename : String,
@@ -46,38 +46,43 @@ impl Config {
     }
 }
 
-pub fn write_svg(fh : File, slice : Polygon, factor: f64) -> Result<(), std::io::Error> {
+pub fn write_svg(fh : File, slice : Layer, factor: f64) -> Result<(), std::io::Error> {
     let mut minx = f64::INFINITY;
     let mut miny = f64::INFINITY;
+
+    for poly in slice.iter() {
+        for point in poly.iter() {
+            if point[0] < minx {
+                minx = point[0];
+            }
+            if point[1] < miny {
+                miny = point[0];
+            }
+        }
+    }
+
+    let mut document = Document::new();
+    for poly in slice.iter() {
+        let mut data = path::Data::new()
+            .move_to(((poly[0][0] - minx) * factor,
+                      (poly[0][1] - miny) * factor));
+
+        for point in poly.iter().skip(1) {
+            data = data.line_to(((point[0] - minx) * factor,
+                                 (point[1] - miny) * factor));
+        }
+        
+        data = data.close();
+
+        let path = Path::new()
+            .set("fill", "none")
+            .set("stroke", "black")
+            .set("stroke-width", 2)
+            .set("d", data);
+
+        document = document.add(path);
+    }
     
-    for point in slice.iter() {
-        if point[0] < minx {
-            minx = point[0];
-        }
-        if point[1] < miny {
-            miny = point[0];
-        }
-    }
-
-    let mut data = path::Data::new()
-        .move_to(((slice[0][0] - minx) * factor,
-                  (slice[0][1] - miny) * factor));
-
-    for point in slice.iter().skip(1) {
-        data = data.line_to(((point[0] - minx) * factor,
-                             (point[1] - miny) * factor));
-    }
-
-    data = data.close();
-
-    let path = Path::new()
-        .set("fill", "none")
-        .set("stroke", "black")
-        .set("stroke-width", 2)
-        .set("d", data);
-
-    let document = Document::new().add(path);
-
     svg::write(fh, &document)
 }
 
@@ -86,7 +91,7 @@ pub fn run(config : Config) -> Result<(), Error> {
     println!("num triangles {}", mesh.faces().count());
 
     let slice = slicer::slice(mesh)?;
-    write_svg(config.output_fh()?, slice, 100.0);
+    write_svg(config.output_fh()?, slice, 100.0)?;
     
     Ok(())
 }
