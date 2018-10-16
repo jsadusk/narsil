@@ -13,8 +13,10 @@ use std::fs::File;
 use std::f64;
 
 use svg::Document;
-use svg::node::element::Path;
+use svg::node::element::Path as svgPath;
 use svg::node::element::path;
+
+use std::path::Path as filePath;
 
 mod model_file;
 mod slicer;
@@ -41,12 +43,22 @@ impl Config {
         File::open(self.input_filename.clone())
     }
 
-    pub fn output_fh(&self) -> Result<File, std::io::Error> {
-        File::create(self.output_filename.clone())
+    pub fn output_fh(&self, id: usize) -> Result<File, std::io::Error> {
+        let orig = filePath::new(&self.output_filename);
+        let dir = orig.parent().unwrap_or(filePath::new(""));
+        let file_stem = orig.file_stem().unwrap_or(std::ffi::OsStr::new(""));
+        let ext = orig.extension().unwrap_or(std::ffi::OsStr::new(""));
+
+        let filename = format!("{}_{}.{}",
+                               file_stem.to_str().unwrap(),
+                               id,
+                               ext.to_str().unwrap());
+        let full = dir.join(filename);
+        File::create(full)
     }
 }
 
-pub fn write_svg(fh : File, slice : Layer, factor: f64) -> Result<(), std::io::Error> {
+pub fn write_svg(fh : File, slice : &Layer, factor: f64) -> Result<(), std::io::Error> {
     let mut minx = f64::INFINITY;
     let mut miny = f64::INFINITY;
 
@@ -74,7 +86,7 @@ pub fn write_svg(fh : File, slice : Layer, factor: f64) -> Result<(), std::io::E
         
         data = data.close();
 
-        let path = Path::new()
+        let path = svgPath::new()
             .set("fill", "none")
             .set("stroke", "black")
             .set("stroke-width", 2)
@@ -90,8 +102,11 @@ pub fn run(config : Config) -> Result<(), Error> {
     let mesh = model_file::load(config.input_fh()?)?;
     println!("num triangles {}", mesh.faces().count());
 
-    let slice = slicer::slice(mesh)?;
-    write_svg(config.output_fh()?, slice, 100.0)?;
+    let slices = slicer::slice(mesh)?;
+
+    for (i, slice) in slices.iter().enumerate() {
+        write_svg(config.output_fh(i)?, slice, 100.0)?;
+    }
     
     Ok(())
 }

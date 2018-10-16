@@ -45,6 +45,7 @@ fn z_range(mesh : &Mesh, face : &Face) -> Range {
 
 pub type Polygon = Vec<Point>;
 pub type Layer = Vec<Polygon>;
+pub type LayerStack = Vec<Layer>;
 struct Segment(Point, Point);
 type FaceList = Vec<FaceIndex>;
 
@@ -72,12 +73,12 @@ fn slice_face(position : f64, mesh : &Mesh, face_index : &FaceIndex) -> (Segment
             continue;
         }
 
-        let fraction = position - bottom[2] / top[2] - bottom[2];
+        let fraction = (position - bottom[2]) / (top[2] - bottom[2]);
         let intersect = Point { x: bottom[0] + (top[0] - bottom[0]) * fraction,
                                 y: bottom[1] + (top[1] - bottom[1]) * fraction,
                                 z: position };
 
-        if point1[2] > point2[2] {
+        if point1[2] < point2[2] {
             seg.0 = intersect;
         }
         else {
@@ -132,18 +133,40 @@ fn slice_layer(position : f64, mesh : &Mesh, starting_faces : FaceList) -> Layer
     layer
 }
 
-pub fn slice(mesh : Mesh) -> SlicerResult<Layer>{
-    let layer_position = 0.1;
+pub fn slice(mesh : Mesh) -> SlicerResult<LayerStack>{
+    let layer_height = 0.2;
 
-    let mut valid_faces = FaceList::new();
-    
+    let mut max_z = f64::NEG_INFINITY;
+    let mut min_z = f64::INFINITY;
+
     for index in mesh.faces() {
         let face = &mesh.face(index);
-        let range =  z_range(&mesh, face);
-        if range.lower < layer_position && range.upper > layer_position {
-            valid_faces.push(index.clone());
+        let range = z_range(&mesh, face);
+        if range.lower < min_z {
+            min_z = range.lower;
+        }
+        if range.upper > max_z {
+            max_z = range.upper;
         }
     }
 
-    Ok(slice_layer(layer_position, &mesh, valid_faces))
+    let num_layers : usize = (max_z / layer_height).round() as usize;
+
+    let mut layers = LayerStack::new();
+    for layer_id in 0..num_layers {
+        let layer_position = (layer_id as f64) * layer_height + layer_height / 2.0;
+        let mut valid_faces = FaceList::new();
+
+        for index in mesh.faces() {
+            let face = &mesh.face(index);
+            let range =  z_range(&mesh, face);
+            if range.lower < layer_position && range.upper > layer_position {
+                valid_faces.push(index.clone());
+            }
+        }
+
+        layers.push(slice_layer(layer_position, &mesh, valid_faces));
+    }
+
+    Ok(layers)
 }
