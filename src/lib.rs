@@ -100,10 +100,11 @@ pub fn write_svg(fh : File, slice : &Layer, factor: f64) -> Result<(), std::io::
 
 pub fn run(config : Config) -> Result<(), Error> {
     let mesh = model_file::load(config.input_fh()?)?;
-    println!("num triangles {}", mesh.faces().count());
 
+    println!("slice");
     let slices = slicer::slice(mesh)?;
 
+    println!("svg");
     for (i, slice) in slices.iter().enumerate() {
         write_svg(config.output_fh(i)?, slice, 100.0)?;
     }

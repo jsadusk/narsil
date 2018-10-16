@@ -202,15 +202,19 @@ impl FromSurface for Mesh {
 type ModelResult<T> = Result<T, ModelError>;
     
 pub fn load(mut fh : File) -> ModelResult<Mesh> {
+    println!("Identify");
     let file_type = identify(&mut fh).map_err(ModelError::IO)?;
 
+    println!("load");
     let free_mesh = match file_type {
         FileType::AsciiStl => ascii_stl::load(fh).map_err(ModelError::AsciiParse)?,
         FileType::BinaryStl => binary_stl::load(fh).map_err(ModelError::BinaryParse)?,
         FileType::Unknown => return Err(ModelError::Unknown)
     };
 
+    println!("unify");
     let (surface, vertices) = unify_vertices(free_mesh);
 
+    println!("mesh");
     Ok(Mesh::from_surface(surface, vertices))
 }
