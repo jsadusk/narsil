@@ -33,9 +33,10 @@ fn read_vertex(buf : &[u8]) -> Vertex {
 
 fn read_triangle(buf : &[u8]) -> FreeTriangle {
     let vertex_size = 12;
-    let a = read_vertex(&buf[0..vertex_size]);
-    let b = read_vertex(&buf[vertex_size..vertex_size * 2]);
-    let c = read_vertex(&buf[vertex_size * 2..vertex_size * 3]);
+    let _normal = read_vertex(&buf[0..vertex_size]);
+    let a = read_vertex(&buf[vertex_size..vertex_size * 2]);
+    let b = read_vertex(&buf[vertex_size * 2..vertex_size * 3]);
+    let c = read_vertex(&buf[vertex_size * 3..vertex_size * 4]);
 
     [a, b, c]
 }
@@ -55,8 +56,9 @@ pub fn load(mut fh : File) -> StlResult<FreeSurface> {
     const TRIANGLE_SIZE : usize =
         4/*bytes per float*/
         *3/*floats per vector*/
-        *4;/*vectors per triangle (normal + 3 points)*/
-
+        *4/*vectors per triangle (normal + 3 points)*/
+        +2;/*attribute bytes*/
+    
     let expected_triangle_bytes = TRIANGLE_SIZE * num_triangles;
     let mut bytes_so_far = 0;
 
@@ -73,10 +75,8 @@ pub fn load(mut fh : File) -> StlResult<FreeSurface> {
                                                 bytes_so_far));
         }
         
-        surface.push(read_triangle(&triangle_buf[4..]));
+        surface.push(read_triangle(&triangle_buf));
     }
 
-    let _attrib = fh.read_u16::<LittleEndian>()?;
-    
     Ok(surface)
 }
