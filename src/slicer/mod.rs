@@ -8,7 +8,13 @@ use std::f64;
 #[derive(Fail, Debug)]
 pub enum SlicerError {
     #[fail(display = "Model is not manifold")]
-    NonManifold
+    NonManifold,
+    #[fail(display = "Starting face is not in attributes map")]
+    StartingFaceNoAttributes,
+    #[fail(display = "No last point in slice")]
+    NoLastPointInSlice,
+    #[fail(display = "Current face is not in attributes map")]
+    CurrentFaceNoAttributes
 }
 
 type SlicerResult<T> = Result<T, SlicerError>;
@@ -56,15 +62,27 @@ impl Segment {
     }
 }
 
+const EPSILON : f64 = 0.0000001;
+
 fn slice_face(position : f64, mesh : &Mesh, face_index : &FaceIndex) -> (Segment, FaceIndex) {
     let face = &mesh.face(*face_index);
     let mut seg = Segment::new();
     let mut next = *face_index;
+    let mut oneset = false;
+    let mut zeroset = false;
     
     for edge_index in mesh.edges(face) {
         let edge = &mesh.edge(edge_index);
-        let point1 = mesh.vertex(edge.vertex_index).point;
-        let point2 = mesh.vertex(mesh.edge(edge.next_index).vertex_index).point;
+        let mut point1 = mesh.vertex(edge.vertex_index).point.clone();
+        let mut point2 = mesh.vertex(mesh.edge(edge.next_index).vertex_index).point.clone();
+
+        if point1[2] == position {
+            point1[2] = point1[2] + EPSILON * 2.0;
+        }
+
+        if point2[2] == position {
+            point2[2] = point2[2] + EPSILON * 2.0;
+        }
 
         let (bottom, top) = if point1[2] < point2[2]
             { (point1, point2) } else { (point2, point1) };
@@ -79,19 +97,32 @@ fn slice_face(position : f64, mesh : &Mesh, face_index : &FaceIndex) -> (Segment
                                 z: position };
 
         if point1[2] < point2[2] {
+            assert!(!zeroset);
+            zeroset = true;
+                
             seg.0 = intersect;
         }
         else {
-            seg.1 = intersect;
-            next = mesh.edge(edge.twin_index).face_index;
+            let Range {lower, upper} = z_range(mesh, mesh.face(mesh.edge(edge.twin_index).face_index));
+            if position > lower && position <= upper {
+                if oneset {
+                    println!("seg.1 was already set");
+                }
+                oneset = true;
+                seg.1 = intersect;
+                next = mesh.edge(edge.twin_index).face_index;
+            }
         }
             
     }
 
+    assert!(oneset);
+    assert!(zeroset);
+
     (seg, next)
 }
 
-fn slice_layer(position : f64, mesh : &Mesh, starting_faces : FaceList) -> Layer {
+fn slice_layer(position : f64, mesh : &Mesh, starting_faces : FaceList) -> SlicerResult<Layer> {
     let mut attrib = HashMap::new();
     for face in starting_faces.iter() {
         attrib.insert(face.clone(), FaceAttrib::new());
@@ -99,9 +130,10 @@ fn slice_layer(position : f64, mesh : &Mesh, starting_faces : FaceList) -> Layer
 
     let mut starting_index : usize = 0;
     let mut layer = Layer::new();
+
     while starting_index < starting_faces.len() {
         while starting_index < starting_faces.len() &&
-              attrib.get(&starting_faces[starting_index]).unwrap().seen {
+              attrib.get(&starting_faces[starting_index]).ok_or(SlicerError::CurrentFaceNoAttributes)?.seen {
                   starting_index += 1;
               }
         if starting_index == starting_faces.len() {
@@ -121,16 +153,16 @@ fn slice_layer(position : f64, mesh : &Mesh, starting_faces : FaceList) -> Layer
             let (new_seg, new_next_face) = slice_face(position, &mesh, &cur_face);
             seg = new_seg;
             next_face = new_next_face;
-            if seg.0 == *slice.last().unwrap() {
+            if seg.0 == *slice.last().ok_or(SlicerError::NoLastPointInSlice)? {
                 slice.push(seg.1);
             }
-            attrib.get_mut(&cur_face).unwrap().seen = true;
+            attrib.get_mut(&cur_face).ok_or(SlicerError::CurrentFaceNoAttributes)?.seen = true;
         }
 
         layer.push(slice);
     }
 
-    layer
+    Ok(layer)
 }
 
 pub fn slice(mesh : Mesh) -> SlicerResult<LayerStack>{
@@ -145,7 +177,7 @@ pub fn slice(mesh : Mesh) -> SlicerResult<LayerStack>{
         if range.lower < min_z {
             min_z = range.lower;
         }
-        if range.upper > max_z {
+        if range.upper >= max_z {
             max_z = range.upper;
         }
     }
@@ -160,12 +192,12 @@ pub fn slice(mesh : Mesh) -> SlicerResult<LayerStack>{
         for index in mesh.faces() {
             let face = &mesh.face(index);
             let range =  z_range(&mesh, face);
-            if range.lower < layer_position && range.upper > layer_position {
+            if range.lower < layer_position && range.upper >= layer_position {
                 valid_faces.push(index.clone());
             }
         }
 
-        layers.push(slice_layer(layer_position, &mesh, valid_faces));
+        layers.push(slice_layer(layer_position, &mesh, valid_faces)?);
     }
 
     Ok(layers)
