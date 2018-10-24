@@ -2,6 +2,7 @@ use std::fs::File;
 use model_file::data::*;
 use std::io;
 use std::io::Read;
+use std::io::BufReader;
 use byteorder::LittleEndian;
 use byteorder::ByteOrder;
 use byteorder::ReadBytesExt;
@@ -43,15 +44,16 @@ fn read_triangle(buf : &[u8]) -> FreeTriangle {
 
 type StlResult<T> = Result<T, StlError>;
 
-pub fn load(mut fh : File) -> StlResult<FreeSurface> {
+pub fn load(fh : File) -> StlResult<FreeSurface> {
     let mut header_buf = [0u8; 80];
-    let num = fh.read(&mut header_buf)?;
+    let mut reader = BufReader::new(fh);
+    let num = reader.read(&mut header_buf)?;
 
     if num != 80 {
         return Err(StlError::HeaderBytes(num));
     }
 
-    let num_triangles = fh.read_u32::<LittleEndian>()? as usize;
+    let num_triangles = reader.read_u32::<LittleEndian>()? as usize;
 
     const TRIANGLE_SIZE : usize =
         4/*bytes per float*/
@@ -63,16 +65,20 @@ pub fn load(mut fh : File) -> StlResult<FreeSurface> {
     let mut bytes_so_far = 0;
 
     let mut surface = FreeSurface::new();
+    let mut triangle_buf = [0u8; TRIANGLE_SIZE];
     
     for _i in 0..num_triangles {
-        let mut triangle_buf = [0u8; TRIANGLE_SIZE];
+        let mut this_bytes = 0;
 
-        let num = fh.read(&mut triangle_buf)?;
-        bytes_so_far += num;
+        while this_bytes  < TRIANGLE_SIZE {
+            let num = reader.read(&mut triangle_buf[this_bytes..])?;
+            bytes_so_far += num;
+            this_bytes += num;
         
-        if num != TRIANGLE_SIZE {
-            return Err(StlError::TrianglesBytes(expected_triangle_bytes,
-                                                bytes_so_far));
+            if num == 0 {
+                return Err(StlError::TrianglesBytes(expected_triangle_bytes,
+                                                    bytes_so_far));
+            }
         }
         
         surface.push(read_triangle(&triangle_buf));
