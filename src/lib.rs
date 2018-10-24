@@ -4,6 +4,7 @@ extern crate regex;
 extern crate byteorder;
 extern crate hedge;
 extern crate svg;
+extern crate quickersort;
 
 #[macro_use]
 extern crate failure;

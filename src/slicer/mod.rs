@@ -4,6 +4,11 @@ use hedge::FaceIndex;
 use hedge::Point;
 use std::collections::HashMap;
 use std::f64;
+use quickersort;
+use std::collections::BinaryHeap;
+use std::cmp::Ord;
+use std::cmp::Ordering;
+use std::cmp::Eq;
 
 #[derive(Fail, Debug)]
 pub enum SlicerError {
@@ -159,10 +164,38 @@ fn slice_layer(position : f64, mesh : &Mesh, starting_faces : FaceList) -> Slice
             attrib.get_mut(&cur_face).ok_or(SlicerError::CurrentFaceNoAttributes)?.seen = true;
         }
 
+        assert!(slice.first() == slice.last());
         layer.push(slice);
     }
 
     Ok(layer)
+}
+
+#[derive(PartialEq)]
+struct TopSortedFace {
+    top : f64,
+    face : FaceIndex
+}
+
+impl TopSortedFace {
+    fn new(mesh : &Mesh, face : FaceIndex) -> TopSortedFace {
+        TopSortedFace { top: z_range(mesh, mesh.face(face)).upper,
+                        face: face}
+    }
+}
+
+impl Eq for TopSortedFace {}
+
+impl Ord for TopSortedFace {
+    fn cmp(&self, other: &TopSortedFace) -> Ordering {
+        return other.top.partial_cmp(&self.top).unwrap();
+    }
+}
+
+impl PartialOrd for TopSortedFace {
+    fn partial_cmp(&self, other: &TopSortedFace) -> Option<Ordering> {
+        return other.top.partial_cmp(&self.top);
+    }
 }
 
 pub fn slice(mesh : Mesh) -> SlicerResult<LayerStack>{
@@ -184,20 +217,31 @@ pub fn slice(mesh : Mesh) -> SlicerResult<LayerStack>{
 
     let num_layers : usize = (max_z / layer_height).round() as usize;
 
+    let mut bottom_sorted : Vec<FaceIndex> = mesh.faces().collect();
+    quickersort::sort_by(&mut bottom_sorted,
+                         &|a, b| z_range(&mesh, mesh.face(*a)).lower.partial_cmp(&z_range(&mesh, mesh.face(*b)).lower).unwrap());
+
+    let mut cur_face_iter = bottom_sorted.iter().peekable();
+    let mut valid_faces = BinaryHeap::new();
+    
     let mut layers = LayerStack::new();
     for layer_id in 0..num_layers {
         let layer_position = (layer_id as f64) * layer_height + layer_height / 2.0;
-        let mut valid_faces = FaceList::new();
 
-        for index in mesh.faces() {
-            let face = &mesh.face(index);
-            let range =  z_range(&mesh, face);
-            if range.lower < layer_position && range.upper >= layer_position {
-                valid_faces.push(index.clone());
+        while cur_face_iter.peek() != None &&
+            z_range(&mesh, mesh.face(**cur_face_iter.peek().unwrap())).lower < layer_position {
+                valid_faces.push(TopSortedFace::new(&mesh, *cur_face_iter.next().unwrap()));
             }
+
+        while !valid_faces.is_empty() && valid_faces.peek().unwrap().top < layer_position {
+            valid_faces.pop();
         }
 
-        layers.push(slice_layer(layer_position, &mesh, valid_faces)?);
+        if !valid_faces.is_empty() {
+            let collected : Vec<FaceIndex> =
+                valid_faces.iter().map(|f|f.face).collect();
+            layers.push(slice_layer(layer_position, &mesh, collected)?);
+        }
     }
 
     Ok(layers)
