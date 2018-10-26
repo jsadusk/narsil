@@ -16,14 +16,17 @@ use std::f64;
 
 use svg::Document;
 use svg::node::element::Path as svgPath;
+use svg::node::element::Group as svgGroup;
 use svg::node::element::path;
+
+use hedge::Mesh;
 
 use std::path::Path as filePath;
 
 mod model_file;
 mod slicer;
 
-use slicer::Layer;
+use slicer::LayerStack;
 
 pub struct Config {
     input_filename : String,
@@ -45,56 +48,93 @@ impl Config {
         File::open(self.input_filename.clone())
     }
 
-    pub fn output_fh(&self, id: usize) -> Result<File, std::io::Error> {
-        let orig = filePath::new(&self.output_filename);
-        let dir = orig.parent().unwrap_or(filePath::new(""));
-        let file_stem = orig.file_stem().unwrap_or(std::ffi::OsStr::new(""));
-        let ext = orig.extension().unwrap_or(std::ffi::OsStr::new(""));
-
-        let filename = format!("{}_{}.{}",
-                               file_stem.to_str().unwrap(),
-                               id,
-                               ext.to_str().unwrap());
-        let full = dir.join(filename);
-        File::create(full)
+    pub fn output_fh(&self) -> Result<File, std::io::Error> {
+        File::create(self.output_filename.clone())
     }
 }
 
-pub fn write_svg(fh : File, slice : &Layer, factor: f64) -> Result<(), std::io::Error> {
-    let mut minx = f64::INFINITY;
-    let mut miny = f64::INFINITY;
+struct Range {
+    min : f64,
+    max : f64
+}
 
-    for poly in slice.iter() {
-        for point in poly.iter() {
-            if point[0] < minx {
-                minx = point[0];
-            }
-            if point[1] < miny {
-                miny = point[0];
-            }
-        }
+impl Range {
+    fn new() -> Range {
+        Range { min : f64::INFINITY,
+                max : f64::NEG_INFINITY }
     }
+}
 
-    let mut document = Document::new();
-    for poly in slice.iter() {
-        let mut data = path::Data::new()
-            .move_to(((poly[0][0] - minx) * factor,
-                      (poly[0][1] - miny) * factor));
+struct Bounds3D {
+    x : Range,
+    y : Range,
+    z : Range
+}
 
-        for point in poly.iter().skip(1) {
-            data = data.line_to(((point[0] - minx) * factor,
-                                 (point[1] - miny) * factor));
+impl Bounds3D {
+    fn new(mesh : &Mesh) -> Bounds3D {
+        let mut bounds = Bounds3D { x : Range::new(),
+                                    y : Range::new(),
+                                    z : Range::new() };
+        for face in mesh.faces().map(|fi| mesh.face(fi)) {
+            for point in mesh.vertices(face).map(|vi| mesh.vertex(vi).point) {
+                if point[0] < bounds.x.min {
+                    bounds.x.min = point[0];
+                }
+                if point[0] > bounds.x.max {
+                    bounds.x.max = point[0];
+                }
+                if point[1] < bounds.y.min {
+                    bounds.y.min = point[1];
+                }
+                if point[1] > bounds.y.max {
+                    bounds.y.max = point[1];
+                }
+                if point[2] < bounds.z.min {
+                    bounds.z.min = point[2];
+                }
+                if point[2] > bounds.z.max {
+                    bounds.z.max = point[2];
+                }
+            }
         }
+
+        bounds
+    }
+}
+
+fn write_svg(fh : File, slices : &LayerStack, bounds : Bounds3D, factor: f64) -> Result<(), std::io::Error> {
+    let mut document = Document::new()
+        .set("viewbox", (0, 0,
+                         (bounds.x.max - bounds.x.min) * factor,
+                         (bounds.y.max - bounds.y.min) * factor));
+    for (id, slice) in slices.iter().enumerate() {
+        let mut group = svgGroup::new()
+            .set("id", format!("layer_{}", id))
+            .set("display", "true");
+
+        for poly in slice.iter() {
+            let mut data = path::Data::new()
+                .move_to(((poly[0][0] - bounds.x.min) * factor,
+                          (poly[0][1] - bounds.y.min) * factor));
+
+            for point in poly.iter().skip(1) {
+                data = data.line_to(((point[0] - bounds.x.min) * factor,
+                                     (point[1] - bounds.y.min) * factor));
+            }
         
-        data = data.close();
+            data = data.close();
 
-        let path = svgPath::new()
-            .set("fill", "none")
-            .set("stroke", "black")
-            .set("stroke-width", 2)
-            .set("d", data);
+            let path = svgPath::new()
+                .set("fill", "none")
+                .set("stroke", "black")
+                .set("stroke-width", 2)
+                .set("d", data);
 
-        document = document.add(path);
+            group = group.add(path);
+        }
+
+        document = document.add(group);
     }
     
     svg::write(fh, &document)
@@ -104,12 +144,10 @@ pub fn run(config : Config) -> Result<(), Error> {
     let mesh = model_file::load(config.input_fh()?)?;
 
     println!("slice");
-    let slices = slicer::slice(mesh)?;
+    let slices = slicer::slice(&mesh)?;
 
     println!("svg");
-    for (i, slice) in slices.iter().enumerate() {
-        write_svg(config.output_fh(i)?, slice, 100.0)?;
-    }
+    write_svg(config.output_fh()?, &slices, Bounds3D::new(&mesh), 10.0)?;
     
     Ok(())
 }
