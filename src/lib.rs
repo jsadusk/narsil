@@ -5,6 +5,7 @@ extern crate byteorder;
 extern crate hedge;
 extern crate svg;
 extern crate quickersort;
+extern crate rayon;
 
 #[macro_use]
 extern crate failure;

@@ -9,6 +9,7 @@ use std::collections::BinaryHeap;
 use std::cmp::Ord;
 use std::cmp::Ordering;
 use std::cmp::Eq;
+use rayon::prelude::*;
 
 #[derive(Fail, Debug)]
 pub enum SlicerError {
@@ -34,9 +35,16 @@ impl FaceAttrib {
     }
 }
 
+#[derive(PartialEq)]
 struct Range {
     lower: f64,
     upper: f64
+}
+
+#[derive(PartialEq)]
+struct FaceRange {
+    face : FaceIndex,
+    range: Range
 }
 
 fn z_range(mesh : &Mesh, face : &Face) -> Range {
@@ -127,7 +135,8 @@ fn slice_face(position : f64, mesh : &Mesh, face_index : &FaceIndex) -> (Segment
     (seg, next)
 }
 
-fn slice_layer(position : f64, mesh : &Mesh, starting_faces : FaceList) -> SlicerResult<Layer> {
+fn slice_layer(position : f64, mesh : &Mesh, starting_faces : &FaceList) -> SlicerResult<Layer> {
+    //println!("Starting layer {}", position);
     let mut attrib = HashMap::new();
     for face in starting_faces.iter() {
         attrib.insert(face.clone(), FaceAttrib::new());
@@ -168,6 +177,7 @@ fn slice_layer(position : f64, mesh : &Mesh, starting_faces : FaceList) -> Slice
         layer.push(slice);
     }
 
+    //println!("Finishing layer {}", position);
     Ok(layer)
 }
 
@@ -177,12 +187,12 @@ struct TopSortedFace {
     face : FaceIndex
 }
 
-impl TopSortedFace {
+/*impl TopSortedFace {
     fn new(mesh : &Mesh, face : FaceIndex) -> TopSortedFace {
         TopSortedFace { top: z_range(mesh, mesh.face(face)).upper,
                         face: face}
     }
-}
+}*/
 
 impl Eq for TopSortedFace {}
 
@@ -199,11 +209,12 @@ impl PartialOrd for TopSortedFace {
 }
 
 pub fn slice(mesh : Mesh) -> SlicerResult<LayerStack>{
-    let layer_height = 0.2;
+    let layer_height = 0.1;
 
     let mut max_z = f64::NEG_INFINITY;
     let mut min_z = f64::INFINITY;
 
+    println!("range");
     for index in mesh.faces() {
         let face = &mesh.face(index);
         let range = z_range(&mesh, face);
@@ -216,21 +227,27 @@ pub fn slice(mesh : Mesh) -> SlicerResult<LayerStack>{
     }
 
     let num_layers : usize = (max_z / layer_height).round() as usize;
-
-    let mut bottom_sorted : Vec<FaceIndex> = mesh.faces().collect();
+    println!("Sort");
+    let mut bottom_sorted : Vec<FaceRange> =
+        mesh.faces().
+        map(|fi| FaceRange{face: fi, range: z_range(&mesh, mesh.face(fi))}).
+        collect();
     quickersort::sort_by(&mut bottom_sorted,
-                         &|a, b| z_range(&mesh, mesh.face(*a)).lower.partial_cmp(&z_range(&mesh, mesh.face(*b)).lower).unwrap());
+                         &|a, b| a.range.lower.partial_cmp(&b.range.lower).unwrap());
 
     let mut cur_face_iter = bottom_sorted.iter().peekable();
     let mut valid_faces = BinaryHeap::new();
-    
-    let mut layers = LayerStack::new();
+
+    println!("Valid faces");
+    let mut layers = Vec::new();
     for layer_id in 0..num_layers {
         let layer_position = (layer_id as f64) * layer_height + layer_height / 2.0;
 
         while cur_face_iter.peek() != None &&
-            z_range(&mesh, mesh.face(**cur_face_iter.peek().unwrap())).lower < layer_position {
-                valid_faces.push(TopSortedFace::new(&mesh, *cur_face_iter.next().unwrap()));
+            cur_face_iter.peek().unwrap().range.lower < layer_position {
+                let facerange = cur_face_iter.next().unwrap();
+                valid_faces.push(TopSortedFace{top : facerange.range.upper,
+                                               face : facerange.face});
             }
 
         while !valid_faces.is_empty() && valid_faces.peek().unwrap().top < layer_position {
@@ -240,9 +257,19 @@ pub fn slice(mesh : Mesh) -> SlicerResult<LayerStack>{
         if !valid_faces.is_empty() {
             let collected : Vec<FaceIndex> =
                 valid_faces.iter().map(|f|f.face).collect();
-            layers.push(slice_layer(layer_position, &mesh, collected)?);
+            layers.push((layer_position, collected));
         }
     }
 
+    println!("Parallel slice");
+    let layer_results : Vec<SlicerResult<Layer>> =
+        layers.par_iter().map(|l| slice_layer(l.0, &mesh, &l.1)).collect();
+
+    let mut layers = Vec::new();
+    
+    for layer_result in layer_results {
+        layers.push(layer_result?);
+    }
+    
     Ok(layers)
 }
