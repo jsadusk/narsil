@@ -208,8 +208,8 @@ impl PartialOrd for TopSortedFace {
     }
 }
 
-pub fn slice(mesh : Mesh) -> SlicerResult<LayerStack>{
-    let layer_height = 0.1;
+pub fn slice(mesh : &Mesh) -> SlicerResult<LayerStack>{
+    let layer_height = 0.2;
 
     let mut max_z = f64::NEG_INFINITY;
     let mut min_z = f64::INFINITY;
