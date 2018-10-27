@@ -13,6 +13,7 @@ extern crate failure;
 use failure::Error;
 use std::fs::File;
 use std::f64;
+use std::io::Write;
 
 use svg::Document;
 use svg::node::element::Path as svgPath;
@@ -103,15 +104,16 @@ impl Bounds3D {
     }
 }
 
-fn write_svg(fh : File, slices : &LayerStack, bounds : Bounds3D, factor: f64) -> Result<(), std::io::Error> {
+fn write_html(mut fh : File, slices : &LayerStack, bounds : Bounds3D, factor: f64) -> Result<(), std::io::Error> {
     let mut document = Document::new()
         .set("viewbox", (0, 0,
                          (bounds.x.max - bounds.x.min) * factor,
-                         (bounds.y.max - bounds.y.min) * factor));
+                         (bounds.y.max - bounds.y.min) * factor))
+        .set("id", "layers");
     for (id, slice) in slices.iter().enumerate() {
         let mut group = svgGroup::new()
             .set("id", format!("layer_{}", id))
-            .set("display", "true");
+            .set("display", "none");
 
         for poly in slice.iter() {
             let mut data = path::Data::new()
@@ -136,8 +138,74 @@ fn write_svg(fh : File, slices : &LayerStack, bounds : Bounds3D, factor: f64) ->
 
         document = document.add(group);
     }
-    
-    svg::write(fh, &document)
+
+    fh.write(format!(r#"
+<!DOCTYPE html><html><head><title>Octopus</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+.slidecontainer {{
+    width: 100%;
+}}
+
+.slider {{
+    -webkit-appearance: none;
+    width: 100%;
+    height: 25px;
+    background: #d3d3d3;
+    outline: none;
+    opacity: 0.7;
+    -webkit-transition: .2s;
+    transition: opacity .2s;
+}}
+
+.slider:hover {{
+    opacity: 1;
+}}
+
+.slider::-webkit-slider-thumb {{
+    -webkit-appearance: none;
+    appearance: none;
+    width: 25px;
+    height: 25px;
+    background: #4CAF50;
+    cursor: pointer;
+}}
+
+.slider::-moz-range-thumb {{
+    width: 25px;
+    height: 25px;
+    background: #4CAF50;
+    cursor: pointer;
+}}
+</style>
+</head><body>
+<div class="slidecontainer">
+  <input type="range" min="0" max="{}" value="0" class="slider" id="layerSlider">
+    <p>Value: <span id="layerId"></span></p>
+</div>
+"#, slices.len() - 1).as_bytes())?;
+    svg::write(&fh, &document)?;
+    fh.write(r#"
+<script>
+var slider = document.getElementById("layerSlider");
+var layerSvg = document.getElementById("layers");
+var output = document.getElementById("layerId");
+var curLayerGroup = layerSvg.getElementById("layer_0");
+curLayerGroup.setAttributeNS(null, 'display', "true");
+
+output.innerHTML = slider.value;
+
+slider.oninput = function() {
+    output.innerHTML = this.value;
+    curLayerGroup.setAttributeNS(null, 'display', null);
+    curlayerGroup = layerSvg.getElementById("layer_" + this.value);
+    curlayerGroup.setAttributeNS(null, 'display', "true");
+}
+</script>
+
+</body></html>
+"#.as_bytes())?;
+    Ok(())
 }
 
 pub fn run(config : Config) -> Result<(), Error> {
@@ -147,7 +215,7 @@ pub fn run(config : Config) -> Result<(), Error> {
     let slices = slicer::slice(&mesh)?;
 
     println!("svg");
-    write_svg(config.output_fh()?, &slices, Bounds3D::new(&mesh), 10.0)?;
+    write_html(config.output_fh()?, &slices, Bounds3D::new(&mesh), 10.0)?;
     
     Ok(())
 }
