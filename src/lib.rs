@@ -110,7 +110,11 @@ impl Bounds3D {
     }
 }
 
-fn write_html(mut fh : File, slices : &LayerStack, bounds : Bounds3D, factor: f64) -> Result<(), std::io::Error> {
+fn write_html(name : String,
+              mut fh : File,
+              slices : &LayerStack,
+              bounds : Bounds3D,
+              factor: f64) -> Result<(), std::io::Error> {
     let mut document = Document::new()
         .set("viewbox", (0, 0,
                          (bounds.x.max - bounds.x.min) * factor,
@@ -146,7 +150,7 @@ fn write_html(mut fh : File, slices : &LayerStack, bounds : Bounds3D, factor: f6
     }
 
     fh.write(format!(r#"
-<!DOCTYPE html><html><head><title>Octopus</title>
+<!DOCTYPE html><html><head><title>{}</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
 .slidecontainer {{
@@ -189,7 +193,7 @@ fn write_html(mut fh : File, slices : &LayerStack, bounds : Bounds3D, factor: f6
   <input type="range" min="0" max="{}" value="0" class="slider" id="layerSlider">
     <p>Value: <span id="layerId"></span></p>
 </div>
-"#, slices.len() - 1).as_bytes())?;
+"#, name, slices.len() - 1).as_bytes())?;
     svg::write(&fh, &document)?;
     fh.write(r#"
 <script>
@@ -203,9 +207,9 @@ output.innerHTML = slider.value;
 
 slider.oninput = function() {
     output.innerHTML = this.value;
-    curLayerGroup.setAttributeNS(null, 'display', null);
+    curLayerGroup.setAttributeNS(null, 'display', 'none');
     curlayerGroup = layerSvg.getElementById("layer_" + this.value);
-    curlayerGroup.setAttributeNS(null, 'display', "true");
+    curlayerGroup.setAttributeNS(null, 'display', 'true');
 }
 </script>
 
@@ -221,7 +225,7 @@ pub fn run(config : Config) -> Result<(), Error> {
     let slices = slicer::slice(&mesh)?;
 
     println!("svg");
-    write_html(config.output_fh()?, &slices, Bounds3D::new(&mesh), 10.0)?;
+    write_html(config.name(), config.output_fh()?, &slices, Bounds3D::new(&mesh), 10.0)?;
     
     Ok(())
 }
