@@ -26,6 +26,7 @@ use std::path::Path as filePath;
 
 mod model_file;
 mod slicer;
+mod builder;
 
 use slicer::LayerStack;
 
