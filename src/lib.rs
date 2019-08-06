@@ -52,6 +52,11 @@ impl Config {
     pub fn output_fh(&self) -> Result<File, std::io::Error> {
         File::create(self.output_filename.clone())
     }
+
+    pub fn name(&self) -> String {
+        let path = filePath::new(self.input_filename.as_str());
+        path.file_name().unwrap().to_str().unwrap().to_string()
+    }
 }
 
 struct Range {
