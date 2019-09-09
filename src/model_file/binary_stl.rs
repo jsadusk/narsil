@@ -6,20 +6,41 @@ use std::io::BufReader;
 use byteorder::LittleEndian;
 use byteorder::ByteOrder;
 use byteorder::ReadBytesExt;
+use std::error;
+use std::fmt;
 
-#[derive(Fail, Debug)]
+#[derive(Debug)]
 pub enum StlError {
-    #[fail(display = "Incomplete header, expected 80 bytes, got {}", _0)]
     HeaderBytes(usize),
-    #[fail(display = "Incomplete triangle data, expected {} bytes, got {}", _0, _1)]
     TrianglesBytes(usize, usize),
-    #[fail(display = "{}", _0)]
-    IO(#[fail(cause)] io::Error)
+    IO(io::Error)
+}
+
+impl error::Error for StlError {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+        match self {
+            Self::IO(e) => Some(e),
+            _ => None
+        }
+    }
 }
 
 impl From<io::Error> for StlError {
     fn from(error : io::Error) -> Self {
         StlError::IO(error)
+    }
+}
+
+impl fmt::Display for StlError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::HeaderBytes(n) =>
+                write!(f, "Incomplete header, expected 80 bytes, got {}", n),
+            Self::TrianglesBytes(e, g) =>
+                write!(f, "Incomplete triangle data, expected {} bytes, got {}",
+                       e, g),
+            Self::IO(e) => write!(f, "{}", e)
+        }
     }
 }
 
@@ -60,13 +81,13 @@ pub fn load(fh : File) -> StlResult<FreeSurface> {
         *3/*floats per vector*/
         *4/*vectors per triangle (normal + 3 points)*/
         +2;/*attribute bytes*/
-    
+
     let expected_triangle_bytes = TRIANGLE_SIZE * num_triangles;
     let mut bytes_so_far = 0;
 
     let mut surface = FreeSurface::new();
     let mut triangle_buf = [0u8; TRIANGLE_SIZE];
-    
+
     for _i in 0..num_triangles {
         let mut this_bytes = 0;
 
@@ -74,13 +95,13 @@ pub fn load(fh : File) -> StlResult<FreeSurface> {
             let num = reader.read(&mut triangle_buf[this_bytes..])?;
             bytes_so_far += num;
             this_bytes += num;
-        
+
             if num == 0 {
                 return Err(StlError::TrianglesBytes(expected_triangle_bytes,
                                                     bytes_so_far));
             }
         }
-        
+
         surface.push(read_triangle(&triangle_buf));
     }
 

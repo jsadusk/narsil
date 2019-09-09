@@ -9,23 +9,64 @@ use std::io::SeekFrom;
 use std::io;
 use std::collections::BTreeMap;
 use std::cmp::Ordering;
+use std::error;
+use std::fmt;
 use model_file::data::*;
 use hedge;
 use hedge::Mesh;
 use hedge::AddGeometry;
 
-#[derive(Fail, Debug)]
+use expression::*;
+
+use crate::error::NarsilError;
+
+#[derive(Debug)]
 pub enum ModelError {
-    #[fail(display = "{}", _0)]
-    IO(#[fail(cause)] io::Error),
-    #[fail(display = "{}", _0)]
-    AsciiParse(#[fail(cause)] ascii_stl::StlError),
-    #[fail(display = "{}", _0)]
-    BinaryParse(#[fail(cause)] binary_stl::StlError),
-    #[fail(display = "Unknown file format")]
+    IO(io::Error),
+    AsciiParse(ascii_stl::StlError),
+    BinaryParse(binary_stl::StlError),
     Unknown
 }
 
+impl error::Error for ModelError {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+        match self {
+            Self::IO(e) => Some(e),
+            Self::AsciiParse(e) => Some(e),
+            Self::BinaryParse(e) => Some(e),
+            Self::Unknown => None
+        }
+    }
+}
+
+impl fmt::Display for ModelError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::IO(e) => write!(f, "{}", e),
+            Self::AsciiParse(e) => write!(f, "{}", e),
+            Self::BinaryParse(e) => write!(f, "{}", e),
+            Self::Unknown => write!(f, "Unknown file format")
+        }
+    }
+}
+
+impl From<io::Error> for ModelError {
+    fn from(e: io::Error) -> Self {
+        Self::IO(e)
+    }
+}
+
+impl From<ascii_stl::StlError> for ModelError {
+    fn from(e: ascii_stl::StlError) -> Self {
+        Self::AsciiParse(e)
+    }
+}
+
+impl From<binary_stl::StlError> for ModelError {
+    fn from(e: binary_stl::StlError) -> Self {
+        Self::BinaryParse(e)
+    }
+}
 
 fn dist_sq(a : &Vertex, b : &Vertex) -> f64 {
     ((*b)[0] - (*a)[0]).powi(2) + ((*b)[1] - (*a)[1]).powi(2) + ((*b)[2] - (*a)[2]).powi(2)
@@ -130,12 +171,12 @@ fn unify_vertices(orig : FreeSurface) -> (Surface, Vertices) {
     let mut vertices = Vertices::new();
     let mut surface = Surface::new();
     let mut vertex_map = BTreeMap::new();
-    
+
     for free_triangle in orig.iter() {
         let mut indexed_triangle = IndexTriangle::new();
         for (i, vertex) in free_triangle.iter().enumerate() {
             let sortable = SortableVertex::new(vertex, epsilon);
-            
+
             let index = vertex_map.entry(sortable).or_insert_with(|| {
                 vertices.push(*vertex);
                 vertices.len() - 1
@@ -157,13 +198,13 @@ enum FileType {
 fn identify(fh : &mut File) -> io::Result<FileType> {
     let mut buffer = [0u8; 6];
     let num = fh.read(&mut buffer)?;
-    
+
     fh.seek(SeekFrom::Start(0))?;
-    
+
     if num != 6 {
         return Ok(FileType::Unknown)
     }
-    
+
     if buffer.iter().zip(b"solid".iter()).all(|(a,b)| a == b) {
         return Ok(FileType::AsciiStl)
     }
@@ -200,15 +241,15 @@ impl FromSurface for Mesh {
 }
 
 type ModelResult<T> = Result<T, ModelError>;
-    
-pub fn load(mut fh : File) -> ModelResult<Mesh> {
+
+pub fn load(mut fh: File) -> ModelResult<Mesh> {
     println!("Identify");
     let file_type = identify(&mut fh).map_err(ModelError::IO)?;
 
     println!("load");
     let free_mesh = match file_type {
-        FileType::AsciiStl => ascii_stl::load(fh).map_err(ModelError::AsciiParse)?,
-        FileType::BinaryStl => binary_stl::load(fh).map_err(ModelError::BinaryParse)?,
+        FileType::AsciiStl => ascii_stl::load(fh)?,
+        FileType::BinaryStl => binary_stl::load(fh)?,
         FileType::Unknown => return Err(ModelError::Unknown)
     };
 
@@ -217,4 +258,17 @@ pub fn load(mut fh : File) -> ModelResult<Mesh> {
 
     println!("mesh");
     Ok(Mesh::from_surface(surface, vertices))
+}
+
+pub struct LoadModel<'a> {
+    pub filename: &'a String
+}
+
+impl<'a> Expression<Mesh, NarsilError> for LoadModel<'a> {
+    fn terms(&self) -> Terms {Terms::new() }
+
+    fn eval(&self) -> Result<Mesh, NarsilError> {
+        let mut fh = File::open(self.filename).unwrap();
+        load(fh).map_err(|e| NarsilError::Model(e))
+    }
 }

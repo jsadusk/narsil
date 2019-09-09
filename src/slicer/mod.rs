@@ -9,18 +9,31 @@ use std::collections::BinaryHeap;
 use std::cmp::Ord;
 use std::cmp::Ordering;
 use std::cmp::Eq;
+use std::error;
+use std::fmt;
 use rayon::prelude::*;
 
-#[derive(Fail, Debug)]
+#[derive(Debug)]
 pub enum SlicerError {
-    #[fail(display = "Model is not manifold")]
     NonManifold,
-    #[fail(display = "Starting face is not in attributes map")]
     StartingFaceNoAttributes,
-    #[fail(display = "No last point in slice")]
     NoLastPointInSlice,
-    #[fail(display = "Current face is not in attributes map")]
     CurrentFaceNoAttributes
+}
+
+impl error::Error for SlicerError {}
+
+impl fmt::Display for SlicerError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::NonManifold => write!(f, "Model is not manifold"),
+            Self::StartingFaceNoAttributes =>
+                write!(f, "Starting face is not in attributes map"),
+            Self::NoLastPointInSlice => write!(f, "No last point in slice"),
+            Self::CurrentFaceNoAttributes =>
+                write!(f, "Current face is not in attributes map")
+        }
+    }
 }
 
 type SlicerResult<T> = Result<T, SlicerError>;

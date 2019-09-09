@@ -6,11 +6,8 @@ extern crate hedge;
 extern crate svg;
 extern crate quickersort;
 extern crate rayon;
+extern crate expression;
 
-#[macro_use]
-extern crate failure;
-
-use failure::Error;
 use std::fs::File;
 use std::f64;
 use std::io::Write;
@@ -22,12 +19,15 @@ use svg::node::element::path;
 
 use hedge::Mesh;
 
+use expression::*;
 use std::path::Path as filePath;
 
 mod model_file;
 mod slicer;
+mod error;
 
 use slicer::LayerStack;
+use crate::error::NarsilError;
 
 pub struct Config {
     input_filename : String,
@@ -217,14 +217,22 @@ slider.oninput = function() {
     Ok(())
 }
 
-pub fn run(config : Config) -> Result<(), Error> {
-    let mesh = model_file::load(config.input_fh()?)?;
+pub fn run(config : Config) -> Result<(), ExpressionError<NarsilError>> {
+    let mut engine = Engine::<NarsilError>::new();
+
+    let mesh_term = engine.term(model_file::LoadModel{ filename: &config.input_filename });
+
+    let mesh = engine.eval(&mesh_term)?;
 
     println!("slice");
-    let slices = slicer::slice(&mesh)?;
+    let slices = slicer::slice(&mesh).map_err(|e| ExpressionError::<NarsilError>::Eval(NarsilError::Slicer(e)))?;
 
     println!("svg");
-    write_html(config.name(), config.output_fh()?, &slices, Bounds3D::new(&mesh), 10.0)?;
-    
+    write_html(config.name(),
+               config.output_fh()
+                 .map_err(|e| ExpressionError::<NarsilError>::Eval(NarsilError::IO(e)))?,
+               &slices, Bounds3D::new(&mesh),
+               10.0).map_err(|e| ExpressionError::<NarsilError>::Eval(NarsilError::IO(e)))?;
+
     Ok(())
 }

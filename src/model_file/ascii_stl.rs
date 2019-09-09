@@ -4,28 +4,47 @@ use std::io;
 use std::io::BufRead;
 use regex::Regex;
 use std::num;
+use std::error;
+use std::fmt;
 
-#[derive(Fail, Debug)]
+#[derive(Debug)]
 pub enum StlError {
-    #[fail(display = "Expected solid: {}", _0)]
     Solid(String),
-    #[fail(display = "Expected facet or endsolid: {}", _0)]
     Facet(String),
-    #[fail(display = "Expected loop or endfacet: {}", _0)]
     Loop(String),
-    #[fail(display = "Expected vertex or endloop: {}", _0)]
     Vertex(String),
-    #[fail(display = "Triangle has {} vertices, expected 3: {}", _0, _1)]
     Triangle(usize, String),
-    #[fail(display = "{}: {}", _0, _1)]
-    Float(#[fail(cause)] num::ParseFloatError, String),
-    #[fail(display = "{}", _0)]
-    IO(#[fail(cause)] io::Error)
+    Float(num::ParseFloatError, String),
+    IO(io::Error)
+}
+
+impl error::Error for StlError {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+        match self {
+            Self::IO(e) => Some(e),
+            Self::Float(e, _) => Some(e),
+            _ => None
+        }
+    }
 }
 
 impl From<io::Error> for StlError {
     fn from(error : io::Error) -> Self {
         StlError::IO(error)
+    }
+}
+
+impl fmt::Display for StlError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Solid(s) => write!(f, "Expected solid; {}", s),
+            Self::Facet(s) => write!(f, "Expected facet or endsolid: {}", s),
+            Self::Loop(s) => write!(f, "Expected loop or endfacet: {}", s),
+            Self::Vertex(s) => write!(f, "Expected vertex or endloop: {}", s),
+            Self::Triangle(n, s) => write!(f, "Triangle has {} vertices, expected 3: {}", n, s),
+            Self::Float(e, s) => write!(f, "{}: {}", e, s),
+            Self::IO(e) => write!(f, "{}", e)
+        }
     }
 }
 
@@ -56,13 +75,13 @@ pub fn load(fh : File) -> StlResult<FreeSurface> {
         static ref ENDSOLID_RE : Regex
             = Regex::new(r"\s*endsolid ([^/s]+)$").unwrap();
     }
-    
-    let reader = io::BufReader::new(&fh);
+
+    let reader = io::BufReader::new(fh);
 
     let mut surface = FreeSurface::new();
     let mut _surface_names : Vec<String> = Vec::new();
     let mut triangle = Vertices::new();
-    
+
     let mut state = STLParseState::Top;
 
     for line in reader.lines() {
@@ -73,7 +92,7 @@ pub fn load(fh : File) -> StlResult<FreeSurface> {
             STLParseState::Top => {
                 let _cap = SOLID_RE.captures(line_str)
                     .ok_or(StlError::Solid(line_str.to_string()))?;
-                
+
                 state = STLParseState::Solid;
             },
             STLParseState::Solid => {
@@ -125,11 +144,11 @@ pub fn load(fh : File) -> StlResult<FreeSurface> {
                             }
 
                             let mut real_triangle = FreeTriangle::new();
-                            
+
                             for (i, vertex) in triangle.iter().enumerate() {
                                 real_triangle[i] = *vertex;
                             }
-                            
+
                             surface.push(real_triangle);
                             state = STLParseState::Facet;
                         },
