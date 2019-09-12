@@ -194,26 +194,32 @@ fn write_html(name : String,
 </div>
 "#, name, slices.len() - 1).as_bytes())?;
     svg::write(&fh, &document)?;
-    fh.write(r#"
+    fh.write(format!(r#"
 <script>
 var slider = document.getElementById("layerSlider");
 var layerSvg = document.getElementById("layers");
 var output = document.getElementById("layerId");
 var curLayerGroup = layerSvg.getElementById("layer_0");
 curLayerGroup.setAttributeNS(null, 'display', "true");
+var numLayers = {};
 
 output.innerHTML = slider.value;
 
-slider.oninput = function() {
+slider.oninput = function() {{
     output.innerHTML = this.value;
-    curLayerGroup.setAttributeNS(null, 'display', 'none');
-    curlayerGroup = layerSvg.getElementById("layer_" + this.value);
-    curlayerGroup.setAttributeNS(null, 'display', 'true');
-}
+
+    for (i = 0; i < numLayers; ++i) {{
+       var thisLayerGroup = layerSvg.getElementById("layer_" + i);
+       thisLayerGroup.setAttributeNS(null, 'display', 'none');
+    }}
+
+    var newLayerGroup = layerSvg.getElementById("layer_" + this.value);
+    newLayerGroup.setAttributeNS(null, 'display', 'true');
+}}
 </script>
 
 </body></html>
-"#.as_bytes())?;
+"#, slices.len()).as_bytes())?;
     Ok(())
 }
 
