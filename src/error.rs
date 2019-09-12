@@ -2,6 +2,7 @@ use model_file;
 use slicer;
 use std::error;
 use std::fmt;
+use expression;
 
 #[derive(Debug)]
 pub enum NarsilError {
@@ -49,3 +50,10 @@ impl From<std::io::Error> for NarsilError {
         Self::IO(other)
     }
 }
+
+impl From<NarsilError> for expression::ExpressionError<NarsilError> {
+    fn from(other: NarsilError) -> Self {
+        Self::Eval(other)
+    }
+}
+

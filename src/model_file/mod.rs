@@ -260,15 +260,15 @@ pub fn load(mut fh: File) -> ModelResult<Mesh> {
     Ok(Mesh::from_surface(surface, vertices))
 }
 
-pub struct LoadModel<'a> {
-    pub filename: &'a String
+pub struct LoadModel {
+    pub fh: File
 }
 
-impl<'a> Expression<Mesh, NarsilError> for LoadModel<'a> {
+impl Expression<Mesh, NarsilError> for LoadModel {
     fn terms(&self) -> Terms {Terms::new() }
 
     fn eval(&self) -> Result<Mesh, NarsilError> {
-        let mut fh = File::open(self.filename).unwrap();
+        let fh = self.fh.try_clone()?;
         load(fh).map_err(|e| NarsilError::Model(e))
     }
 }

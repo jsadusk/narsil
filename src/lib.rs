@@ -226,7 +226,7 @@ slider.oninput = function() {{
 pub fn run(config : Config) -> Result<(), ExpressionError<NarsilError>> {
     let mut engine = Engine::<NarsilError>::new();
 
-    let mesh_term = engine.term(model_file::LoadModel{ filename: &config.input_filename });
+    let mesh_term = engine.term(model_file::LoadModel{ fh: config.input_fh().map_err(|e| NarsilError::IO(e))? });
 
     let mesh = engine.eval(&mesh_term)?;
 
