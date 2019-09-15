@@ -65,7 +65,7 @@ fn read_triangle(buf : &[u8]) -> FreeTriangle {
 
 type StlResult<T> = Result<T, StlError>;
 
-pub fn load(fh : File) -> StlResult<FreeSurface> {
+pub fn load(fh : &File) -> StlResult<FreeSurface> {
     let mut header_buf = [0u8; 80];
     let mut reader = BufReader::new(fh);
     let num = reader.read(&mut header_buf)?;

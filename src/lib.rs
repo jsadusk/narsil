@@ -226,9 +226,15 @@ slider.oninput = function() {{
 pub fn run(config : Config) -> Result<(), ExpressionError<NarsilError>> {
     let mut engine = Engine::<NarsilError>::new();
 
-    let mesh_term = engine.term(model_file::LoadModel{ fh: config.input_fh().map_err(|e| NarsilError::IO(e))? });
+    let input_fh = config.input_fh().map_err(|e| NarsilError::IO(e))?;
 
-    let mesh = engine.eval(&mesh_term)?;
+    let ft = engine.term(model_file::IdentifyModelType { fh: input_fh.try_clone().map_err(|e| ExpressionError::<NarsilError>::Eval(NarsilError::IO(e)))? });
+    let free_surface = engine.term(model_file::LoadTriangles{ fh: input_fh.try_clone().map_err(|e| ExpressionError::<NarsilError>::Eval(NarsilError::IO(e)))?,
+                                                         ft: ft });
+    let unified_triangles = engine.term(model_file::UnifyVertices { free_mesh: free_surface });
+    let connected_mesh = engine.term(model_file::ConnectedMesh{ unified_triangles: unified_triangles });
+
+    let mesh = engine.eval(&connected_mesh)?;
 
     println!("slice");
     let slices = slicer::slice(&mesh).map_err(|e| ExpressionError::<NarsilError>::Eval(NarsilError::Slicer(e)))?;

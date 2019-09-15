@@ -130,7 +130,7 @@ impl PartialEq for SortableVertex {
 
 impl Eq for SortableVertex {}
 
-fn unify_vertices(orig : FreeSurface) -> (Surface, Vertices) {
+fn unify_vertices(orig : &FreeSurface) -> (Surface, Vertices) {
     //something to start
     let mut min_edge_len_sq = dist_sq(&orig[0][0], &orig[0][1]);
 
@@ -189,7 +189,7 @@ fn unify_vertices(orig : FreeSurface) -> (Surface, Vertices) {
     (surface, vertices)
 }
 
-enum FileType {
+pub enum FileType {
     Unknown,
     AsciiStl,
     BinaryStl
@@ -248,16 +248,82 @@ pub fn load(mut fh: File) -> ModelResult<Mesh> {
 
     println!("load");
     let free_mesh = match file_type {
-        FileType::AsciiStl => ascii_stl::load(fh)?,
-        FileType::BinaryStl => binary_stl::load(fh)?,
+        FileType::AsciiStl => ascii_stl::load(&fh)?,
+        FileType::BinaryStl => binary_stl::load(&fh)?,
         FileType::Unknown => return Err(ModelError::Unknown)
     };
 
     println!("unify");
-    let (surface, vertices) = unify_vertices(free_mesh);
+    let (surface, vertices) = unify_vertices(&free_mesh);
 
     println!("mesh");
     Ok(Mesh::from_surface(surface, vertices))
+}
+
+pub struct IdentifyModelType {
+    pub fh: File
+}
+
+impl Expression<FileType, NarsilError> for IdentifyModelType {
+    fn terms(&self) -> Terms { Terms::new() }
+
+    fn eval(&self) -> Result<FileType, NarsilError> {
+        let mut fh = self.fh.try_clone()?;
+        identify(&mut fh).map_err(|e| NarsilError::Model(ModelError::IO(e)))
+    }
+}
+
+pub struct LoadTriangles {
+    pub fh: File,
+    pub ft: TypedTerm<FileType>
+}
+
+impl Expression<FreeSurface, NarsilError> for LoadTriangles {
+    fn terms(&self) -> Terms {
+        vec!(self.ft.term())
+    }
+
+    fn eval(&self) -> Result<FreeSurface, NarsilError> {
+        match *self.ft {
+            FileType::AsciiStl => ascii_stl::load(&self.fh).map_err(|e|NarsilError::Model(ModelError::AsciiParse(e))),
+            FileType::BinaryStl => binary_stl::load(&self.fh).map_err(|e|NarsilError::Model(ModelError::BinaryParse(e))),
+            FileType::Unknown => return Err(NarsilError::Model(ModelError::Unknown))
+        }
+    }
+}
+
+pub struct UnifiedTriangles {
+    surface: Surface,
+    vertices: Vertices
+}
+
+pub struct UnifyVertices {
+    pub free_mesh: TypedTerm<FreeSurface>
+}
+
+impl Expression<UnifiedTriangles, NarsilError> for UnifyVertices {
+    fn terms(&self) -> Terms {
+        vec!(self.free_mesh.term())
+    }
+
+    fn eval(&self) -> Result<UnifiedTriangles, NarsilError> {
+        let (surface, vertices) = unify_vertices(&*self.free_mesh);
+        Ok(UnifiedTriangles { surface: surface, vertices: vertices })
+    }
+}
+
+pub struct ConnectedMesh {
+    pub unified_triangles: TypedTerm<UnifiedTriangles>
+}
+
+impl Expression<Mesh, NarsilError> for ConnectedMesh {
+    fn terms(&self) -> Terms {
+        vec!(self.unified_triangles.term())
+    }
+
+    fn eval(&self) -> Result<Mesh, NarsilError> {
+        Ok(Mesh::from_surface(self.unified_triangles.surface.clone(), self.unified_triangles.vertices.clone()))
+    }
 }
 
 pub struct LoadModel {

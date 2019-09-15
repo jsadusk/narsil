@@ -57,7 +57,7 @@ enum STLParseState {
     Loop
 }
 
-pub fn load(fh : File) -> StlResult<FreeSurface> {
+pub fn load(fh : &File) -> StlResult<FreeSurface> {
     lazy_static! {
         static ref SOLID_RE : Regex =
             Regex::new(r"solid (.+)$").unwrap();
