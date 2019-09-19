@@ -226,7 +226,7 @@ slider.oninput = function() {{
 pub fn run(config : Config) -> Result<(), ExpressionError<NarsilError>> {
     let mut engine = Engine::<NarsilError>::new();
 
-    let input_fh = config.input_fh().map_err(|e| NarsilError::IO(e))?;
+    let input_fh = config.input_fh().map_err(NarsilError::IO)?;
 
     let ft = engine.term(model_file::IdentifyModelType { fh: input_fh.try_clone().map_err(|e| ExpressionError::<NarsilError>::Eval(NarsilError::IO(e)))? });
     let free_surface = engine.term(model_file::LoadTriangles{ fh: input_fh.try_clone().map_err(|e| ExpressionError::<NarsilError>::Eval(NarsilError::IO(e)))?,

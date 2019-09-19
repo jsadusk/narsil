@@ -264,12 +264,12 @@ pub struct IdentifyModelType {
     pub fh: File
 }
 
-impl Expression<FileType, NarsilError> for IdentifyModelType {
+impl Expression<FileType, ModelError> for IdentifyModelType {
     fn terms(&self) -> Terms { Terms::new() }
 
-    fn eval(&self) -> Result<FileType, NarsilError> {
+    fn eval(&self) -> Result<FileType, ModelError> {
         let mut fh = self.fh.try_clone()?;
-        identify(&mut fh).map_err(|e| NarsilError::Model(ModelError::IO(e)))
+        identify(&mut fh).map_err(|e| ModelError::IO(e))
     }
 }
 
@@ -278,16 +278,16 @@ pub struct LoadTriangles {
     pub ft: TypedTerm<FileType>
 }
 
-impl Expression<FreeSurface, NarsilError> for LoadTriangles {
+impl Expression<FreeSurface, ModelError> for LoadTriangles {
     fn terms(&self) -> Terms {
         vec!(self.ft.term())
     }
 
-    fn eval(&self) -> Result<FreeSurface, NarsilError> {
+    fn eval(&self) -> Result<FreeSurface, ModelError> {
         match *self.ft {
-            FileType::AsciiStl => ascii_stl::load(&self.fh).map_err(|e|NarsilError::Model(ModelError::AsciiParse(e))),
-            FileType::BinaryStl => binary_stl::load(&self.fh).map_err(|e|NarsilError::Model(ModelError::BinaryParse(e))),
-            FileType::Unknown => return Err(NarsilError::Model(ModelError::Unknown))
+            FileType::AsciiStl => ascii_stl::load(&self.fh).map_err(|e| e.into()),
+            FileType::BinaryStl => binary_stl::load(&self.fh).map_err(|e| e.into()),
+            FileType::Unknown => return Err(ModelError::Unknown)
         }
     }
 }
@@ -301,12 +301,12 @@ pub struct UnifyVertices {
     pub free_mesh: TypedTerm<FreeSurface>
 }
 
-impl Expression<UnifiedTriangles, NarsilError> for UnifyVertices {
+impl Expression<UnifiedTriangles, ModelError> for UnifyVertices {
     fn terms(&self) -> Terms {
         vec!(self.free_mesh.term())
     }
 
-    fn eval(&self) -> Result<UnifiedTriangles, NarsilError> {
+    fn eval(&self) -> Result<UnifiedTriangles, ModelError> {
         let (surface, vertices) = unify_vertices(&*self.free_mesh);
         Ok(UnifiedTriangles { surface: surface, vertices: vertices })
     }
@@ -316,12 +316,12 @@ pub struct ConnectedMesh {
     pub unified_triangles: TypedTerm<UnifiedTriangles>
 }
 
-impl Expression<Mesh, NarsilError> for ConnectedMesh {
+impl Expression<Mesh, ModelError> for ConnectedMesh {
     fn terms(&self) -> Terms {
         vec!(self.unified_triangles.term())
     }
 
-    fn eval(&self) -> Result<Mesh, NarsilError> {
+    fn eval(&self) -> Result<Mesh, ModelError> {
         Ok(Mesh::from_surface(self.unified_triangles.surface.clone(), self.unified_triangles.vertices.clone()))
     }
 }
