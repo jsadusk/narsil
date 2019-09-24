@@ -8,7 +8,8 @@ use expression;
 pub enum NarsilError {
     Model(model_file::ModelError),
     Slicer(slicer::SlicerError),
-    IO(std::io::Error)
+    IO(std::io::Error),
+    Unknown,
 }
 
 impl error::Error for NarsilError {
@@ -16,7 +17,8 @@ impl error::Error for NarsilError {
         match self {
             Self::Model(e) => Some(e),
             Self::Slicer(e) => Some(e),
-            Self::IO(e) => Some(e)
+            Self::IO(e) => Some(e),
+            Self::Unknown => None
         }
     }
 }
@@ -28,7 +30,9 @@ impl fmt::Display for NarsilError {
             Self::Slicer(e) =>
                 write!(f, "Error generating slice outlines: {}", e),
             Self::IO(e) =>
-                write!(f, "{}", e)
+                write!(f, "{}", e),
+            Self::Unknown =>
+                write!(f, "Unknown error"),
         }
     }
 }
@@ -51,6 +55,11 @@ impl From<std::io::Error> for NarsilError {
     }
 }
 
+impl From<()> for NarsilError {
+    fn from(_other: ()) -> Self {
+        Self::Unknown
+    }
+}
 impl From<NarsilError> for expression::ExpressionError<NarsilError> {
     fn from(other: NarsilError) -> Self {
         Self::Eval(other)
