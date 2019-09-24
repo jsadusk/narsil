@@ -13,6 +13,8 @@ use std::error;
 use std::fmt;
 use rayon::prelude::*;
 
+use expression::*;
+
 #[derive(Debug)]
 pub enum SlicerError {
     NonManifold,
@@ -279,10 +281,27 @@ pub fn slice(mesh : &Mesh) -> SlicerResult<LayerStack>{
         layers.par_iter().map(|l| slice_layer(l.0, &mesh, &l.1)).collect();
 
     let mut layers = Vec::new();
-    
+
     for layer_result in layer_results {
         layers.push(layer_result?);
     }
-    
+
     Ok(layers)
+}
+
+pub struct SliceMesh {
+    pub mesh: TypedTerm<Mesh>
+}
+
+impl Expression for SliceMesh {
+    type ValueType = LayerStack;
+    type ErrorType = SlicerError;
+
+    fn terms(&self) -> Terms {
+        vec!(self.mesh.term())
+    }
+
+    fn eval(&self) -> SlicerResult<LayerStack> {
+        slice(&*self.mesh)
+    }
 }

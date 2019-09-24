@@ -234,10 +234,10 @@ pub fn run(config : Config) -> Result<(), ExpressionError<NarsilError>> {
     let unified_triangles = engine.term(model_file::UnifyVertices { free_mesh: free_surface });
     let connected_mesh = engine.term(model_file::ConnectedMesh{ unified_triangles: unified_triangles });
 
-    let mesh = engine.eval(&connected_mesh)?;
+    let mesh = connected_mesh.clone();
+    let slicer = engine.term(slicer::SliceMesh { mesh: connected_mesh });
 
-    println!("slice");
-    let slices = slicer::slice(&mesh).map_err(|e| ExpressionError::<NarsilError>::Eval(NarsilError::Slicer(e)))?;
+    let slices = engine.eval(&slicer)?;
 
     println!("svg");
     write_html(config.name(),
