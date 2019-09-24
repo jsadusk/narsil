@@ -18,8 +18,6 @@ use hedge::AddGeometry;
 
 use expression::*;
 
-use crate::error::NarsilError;
-
 #[derive(Debug)]
 pub enum ModelError {
     IO(io::Error),
@@ -67,6 +65,8 @@ impl From<binary_stl::StlError> for ModelError {
         Self::BinaryParse(e)
     }
 }
+
+type ModelResult<T> = Result<T, ModelError>;
 
 fn dist_sq(a : &Vertex, b : &Vertex) -> f64 {
     ((*b)[0] - (*a)[0]).powi(2) + ((*b)[1] - (*a)[1]).powi(2) + ((*b)[2] - (*a)[2]).powi(2)
@@ -240,34 +240,17 @@ impl FromSurface for Mesh {
     }
 }
 
-type ModelResult<T> = Result<T, ModelError>;
-
-pub fn load(mut fh: File) -> ModelResult<Mesh> {
-    println!("Identify");
-    let file_type = identify(&mut fh).map_err(ModelError::IO)?;
-
-    println!("load");
-    let free_mesh = match file_type {
-        FileType::AsciiStl => ascii_stl::load(&fh)?,
-        FileType::BinaryStl => binary_stl::load(&fh)?,
-        FileType::Unknown => return Err(ModelError::Unknown)
-    };
-
-    println!("unify");
-    let (surface, vertices) = unify_vertices(&free_mesh);
-
-    println!("mesh");
-    Ok(Mesh::from_surface(surface, vertices))
-}
-
 pub struct IdentifyModelType {
     pub fh: File
 }
 
-impl Expression<FileType, ModelError> for IdentifyModelType {
+impl Expression for IdentifyModelType {
+    type ValueType = FileType;
+    type ErrorType = ModelError;
+
     fn terms(&self) -> Terms { Terms::new() }
 
-    fn eval(&self) -> Result<FileType, ModelError> {
+    fn eval(&self) -> ModelResult<FileType> {
         let mut fh = self.fh.try_clone()?;
         identify(&mut fh).map_err(|e| ModelError::IO(e))
     }
@@ -278,12 +261,15 @@ pub struct LoadTriangles {
     pub ft: TypedTerm<FileType>
 }
 
-impl Expression<FreeSurface, ModelError> for LoadTriangles {
+impl Expression for LoadTriangles {
+    type ValueType = FreeSurface;
+    type ErrorType = ModelError;
+
     fn terms(&self) -> Terms {
         vec!(self.ft.term())
     }
 
-    fn eval(&self) -> Result<FreeSurface, ModelError> {
+    fn eval(&self) -> ModelResult<FreeSurface> {
         match *self.ft {
             FileType::AsciiStl => ascii_stl::load(&self.fh).map_err(|e| e.into()),
             FileType::BinaryStl => binary_stl::load(&self.fh).map_err(|e| e.into()),
@@ -301,12 +287,15 @@ pub struct UnifyVertices {
     pub free_mesh: TypedTerm<FreeSurface>
 }
 
-impl Expression<UnifiedTriangles, ModelError> for UnifyVertices {
+impl Expression for UnifyVertices {
+    type ValueType = UnifiedTriangles;
+    type ErrorType = ModelError;
+
     fn terms(&self) -> Terms {
         vec!(self.free_mesh.term())
     }
 
-    fn eval(&self) -> Result<UnifiedTriangles, ModelError> {
+    fn eval(&self) -> ModelResult<UnifiedTriangles> {
         let (surface, vertices) = unify_vertices(&*self.free_mesh);
         Ok(UnifiedTriangles { surface: surface, vertices: vertices })
     }
@@ -316,25 +305,16 @@ pub struct ConnectedMesh {
     pub unified_triangles: TypedTerm<UnifiedTriangles>
 }
 
-impl Expression<Mesh, ModelError> for ConnectedMesh {
+impl Expression for ConnectedMesh {
+    type ValueType = Mesh;
+    type ErrorType = ModelError;
+
     fn terms(&self) -> Terms {
         vec!(self.unified_triangles.term())
     }
 
-    fn eval(&self) -> Result<Mesh, ModelError> {
+    fn eval(&self) -> ModelResult<Mesh> {
         Ok(Mesh::from_surface(self.unified_triangles.surface.clone(), self.unified_triangles.vertices.clone()))
     }
 }
 
-pub struct LoadModel {
-    pub fh: File
-}
-
-impl Expression<Mesh, NarsilError> for LoadModel {
-    fn terms(&self) -> Terms {Terms::new() }
-
-    fn eval(&self) -> Result<Mesh, NarsilError> {
-        let fh = self.fh.try_clone()?;
-        load(fh).map_err(|e| NarsilError::Model(e))
-    }
-}
