@@ -15,6 +15,8 @@ use rayon::prelude::*;
 
 use expression::*;
 
+use crate::mesh::{Bounds3D, Range};
+
 #[derive(Debug)]
 pub enum SlicerError {
     NonManifold,
@@ -51,30 +53,24 @@ impl FaceAttrib {
 }
 
 #[derive(PartialEq)]
-struct Range {
-    lower: f64,
-    upper: f64
-}
-
-#[derive(PartialEq)]
 struct FaceRange {
     face : FaceIndex,
     range: Range
 }
 
 fn z_range(mesh : &Mesh, face : &Face) -> Range {
-    let mut upper = f64::NEG_INFINITY;
-    let mut lower = f64::INFINITY;
+    let mut max = f64::NEG_INFINITY;
+    let mut min = f64::INFINITY;
     for index in mesh.vertices(face) {
         let point = &mesh.vertex(index).point;
-        if point[2] < lower {
-            lower = point[2];
+        if point[2] < min {
+            min = point[2];
         }
-        if point[2] > upper {
-            upper = point[2];
+        if point[2] > max {
+            max = point[2];
         }
     }
-    Range {lower, upper}
+    Range {min, max}
 }
 
 pub type Polygon = Vec<Point>;
@@ -98,7 +94,7 @@ fn slice_face(position : f64, mesh : &Mesh, face_index : &FaceIndex) -> (Segment
     let mut next = *face_index;
     let mut oneset = false;
     let mut zeroset = false;
-    
+
     for edge_index in mesh.edges(face) {
         let edge = &mesh.edge(edge_index);
         let mut point1 = mesh.vertex(edge.vertex_index).point.clone();
@@ -127,12 +123,12 @@ fn slice_face(position : f64, mesh : &Mesh, face_index : &FaceIndex) -> (Segment
         if point1[2] < point2[2] {
             assert!(!zeroset);
             zeroset = true;
-                
+
             seg.0 = intersect;
         }
         else {
-            let Range {lower, upper} = z_range(mesh, mesh.face(mesh.edge(edge.twin_index).face_index));
-            if position > lower && position <= upper {
+            let Range {min, max} = z_range(mesh, mesh.face(mesh.edge(edge.twin_index).face_index));
+            if position > min && position <= max {
                 if oneset {
                     println!("seg.1 was already set");
                 }
@@ -141,7 +137,6 @@ fn slice_face(position : f64, mesh : &Mesh, face_index : &FaceIndex) -> (Segment
                 next = mesh.edge(edge.twin_index).face_index;
             }
         }
-            
     }
 
     assert!(oneset);
@@ -171,12 +166,12 @@ fn slice_layer(position : f64, mesh : &Mesh, starting_faces : &FaceList) -> Slic
 
         let mut slice = Polygon::new();
         let starting_face = &starting_faces[starting_index];
-        
+
         let (mut seg, mut next_face) = slice_face(position, &mesh, &starting_face);
         slice.push(seg.0);
         slice.push(seg.1);
         attrib.get_mut(starting_face).unwrap().seen = true;
-        
+
         while next_face != *starting_face {
             let cur_face = next_face;
             let (new_seg, new_next_face) = slice_face(position, &mesh, &cur_face);
@@ -192,7 +187,6 @@ fn slice_layer(position : f64, mesh : &Mesh, starting_faces : &FaceList) -> Slic
         layer.push(slice);
     }
 
-    //println!("Finishing layer {}", position);
     Ok(layer)
 }
 
@@ -201,13 +195,6 @@ struct TopSortedFace {
     top : f64,
     face : FaceIndex
 }
-
-/*impl TopSortedFace {
-    fn new(mesh : &Mesh, face : FaceIndex) -> TopSortedFace {
-        TopSortedFace { top: z_range(mesh, mesh.face(face)).upper,
-                        face: face}
-    }
-}*/
 
 impl Eq for TopSortedFace {}
 
@@ -223,74 +210,9 @@ impl PartialOrd for TopSortedFace {
     }
 }
 
-pub fn slice(mesh : &Mesh) -> SlicerResult<LayerStack>{
-    let layer_height = 0.2;
-
-    let mut max_z = f64::NEG_INFINITY;
-    let mut min_z = f64::INFINITY;
-
-    println!("range");
-    for index in mesh.faces() {
-        let face = &mesh.face(index);
-        let range = z_range(&mesh, face);
-        if range.lower < min_z {
-            min_z = range.lower;
-        }
-        if range.upper >= max_z {
-            max_z = range.upper;
-        }
-    }
-
-    let num_layers : usize = (max_z / layer_height).round() as usize;
-    println!("Sort");
-    let mut bottom_sorted : Vec<FaceRange> =
-        mesh.faces().
-        map(|fi| FaceRange{face: fi, range: z_range(&mesh, mesh.face(fi))}).
-        collect();
-    quickersort::sort_by(&mut bottom_sorted,
-                         &|a, b| a.range.lower.partial_cmp(&b.range.lower).unwrap());
-
-    let mut cur_face_iter = bottom_sorted.iter().peekable();
-    let mut valid_faces = BinaryHeap::new();
-
-    println!("Valid faces");
-    let mut layers = Vec::new();
-    for layer_id in 0..num_layers {
-        let layer_position = (layer_id as f64) * layer_height + layer_height / 2.0;
-
-        while cur_face_iter.peek() != None &&
-            cur_face_iter.peek().unwrap().range.lower < layer_position {
-                let facerange = cur_face_iter.next().unwrap();
-                valid_faces.push(TopSortedFace{top : facerange.range.upper,
-                                               face : facerange.face});
-            }
-
-        while !valid_faces.is_empty() && valid_faces.peek().unwrap().top < layer_position {
-            valid_faces.pop();
-        }
-
-        if !valid_faces.is_empty() {
-            let collected : Vec<FaceIndex> =
-                valid_faces.iter().map(|f|f.face).collect();
-            layers.push((layer_position, collected));
-        }
-    }
-
-    println!("Parallel slice");
-    let layer_results : Vec<SlicerResult<Layer>> =
-        layers.par_iter().map(|l| slice_layer(l.0, &mesh, &l.1)).collect();
-
-    let mut layers = Vec::new();
-
-    for layer_result in layer_results {
-        layers.push(layer_result?);
-    }
-
-    Ok(layers)
-}
-
 pub struct SliceMesh {
-    pub mesh: TypedTerm<Mesh>
+    pub mesh: TypedTerm<Mesh>,
+    pub bounds: TypedTerm<Bounds3D>
 }
 
 impl Expression for SliceMesh {
@@ -298,10 +220,60 @@ impl Expression for SliceMesh {
     type ErrorType = SlicerError;
 
     fn terms(&self) -> Terms {
-        vec!(self.mesh.term())
+        vec!(self.mesh.term(), self.bounds.term())
     }
 
     fn eval(&self) -> SlicerResult<LayerStack> {
-        slice(&*self.mesh)
+        let layer_height = 0.2;
+
+        let max_z = self.bounds.z.max;
+        let mesh = &*self.mesh;
+
+        let num_layers : usize = (max_z / layer_height).round() as usize;
+        println!("Sort");
+        let mut bottom_sorted : Vec<FaceRange> =
+            mesh.faces().
+            map(|fi| FaceRange{face: fi, range: z_range(&mesh, mesh.face(fi))}).
+            collect();
+        quickersort::sort_by(&mut bottom_sorted,
+                             &|a, b| a.range.min.partial_cmp(&b.range.min).unwrap());
+
+        let mut cur_face_iter = bottom_sorted.iter().peekable();
+        let mut valid_faces = BinaryHeap::new();
+
+        println!("Valid faces");
+        let mut layers = Vec::new();
+        for layer_id in 0..num_layers {
+            let layer_position = (layer_id as f64) * layer_height + layer_height / 2.0;
+
+            while cur_face_iter.peek() != None &&
+                cur_face_iter.peek().unwrap().range.min < layer_position {
+                    let facerange = cur_face_iter.next().unwrap();
+                    valid_faces.push(TopSortedFace{top : facerange.range.max,
+                                                   face : facerange.face});
+                }
+
+            while !valid_faces.is_empty() && valid_faces.peek().unwrap().top < layer_position {
+                valid_faces.pop();
+            }
+
+            if !valid_faces.is_empty() {
+                let collected : Vec<FaceIndex> =
+                    valid_faces.iter().map(|f|f.face).collect();
+                layers.push((layer_position, collected));
+            }
+        }
+
+        println!("Parallel slice");
+        let layer_results : Vec<SlicerResult<Layer>> =
+            layers.par_iter().map(|l| slice_layer(l.0, &mesh, &l.1)).collect();
+
+        let mut layers = Vec::new();
+
+        for layer_result in layer_results {
+            layers.push(layer_result?);
+        }
+
+        Ok(layers)
     }
 }

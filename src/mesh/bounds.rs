@@ -3,6 +3,7 @@ use hedge::Mesh;
 
 use expression::*;
 
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Range {
     pub min : f64,
     pub max : f64
@@ -15,6 +16,7 @@ impl Range {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Bounds3D {
     pub x : Range,
     pub y : Range,
