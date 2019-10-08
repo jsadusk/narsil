@@ -53,7 +53,7 @@ impl FaceAttrib {
 }
 
 #[derive(PartialEq)]
-struct FaceRange {
+pub struct FaceRange {
     face : FaceIndex,
     range: Range
 }
@@ -267,6 +267,104 @@ impl Expression for SliceMesh {
         println!("Parallel slice");
         let layer_results : Vec<SlicerResult<Layer>> =
             layers.par_iter().map(|l| slice_layer(l.0, &mesh, &l.1)).collect();
+
+        let mut layers = Vec::new();
+
+        for layer_result in layer_results {
+            layers.push(layer_result?);
+        }
+
+        Ok(layers)
+    }
+}
+
+pub struct SortedFaces {
+    pub mesh: TypedTerm<Mesh>
+}
+
+impl Expression for SortedFaces {
+    type ValueType = Vec<FaceRange>;
+    type ErrorType = SlicerError;
+
+    fn terms(&self) -> Terms {
+        vec!(self.mesh.term())
+    }
+
+    fn eval(&self) -> SlicerResult<Vec<FaceRange>> {
+        let mut bottom_sorted : Vec<FaceRange> =
+            self.mesh.faces().
+            map(|fi| FaceRange{face: fi, range: z_range(&*self.mesh, self.mesh.face(fi))}).
+            collect();
+        quickersort::sort_by(&mut bottom_sorted,
+                             &|a, b| a.range.min.partial_cmp(&b.range.min).unwrap());
+        Ok(bottom_sorted)
+    }
+}
+
+pub struct LayerFaces {
+    pub mesh: TypedTerm<Mesh>,
+    pub bounds: TypedTerm<Bounds3D>,
+    pub sorted_faces: TypedTerm<Vec<FaceRange>>,
+}
+
+impl Expression for LayerFaces {
+    type ValueType = Vec<(f64, Vec<FaceIndex>)>;
+    type ErrorType = SlicerError;
+
+    fn terms(&self) -> Terms {
+        vec!(self.mesh.term(), self.bounds.term(), self.sorted_faces.term())
+    }
+
+    fn eval(&self) -> SlicerResult<Vec<(f64, Vec<FaceIndex>)>> {
+        let layer_height = 0.2;
+
+        let max_z = self.bounds.z.max;
+        let num_layers : usize = (max_z / layer_height).round() as usize;
+        let mut cur_face_iter = self.sorted_faces.iter().peekable();
+        let mut valid_faces = BinaryHeap::new();
+        let mut layers = Vec::new();
+        for layer_id in 0..num_layers {
+            let layer_position = (layer_id as f64) * layer_height + layer_height / 2.0;
+
+            while cur_face_iter.peek() != None &&
+                cur_face_iter.peek().unwrap().range.min < layer_position {
+                    let facerange = cur_face_iter.next().unwrap();
+                    valid_faces.push(TopSortedFace{top : facerange.range.max,
+                                                   face : facerange.face});
+                }
+
+            while !valid_faces.is_empty() && valid_faces.peek().unwrap().top < layer_position {
+                valid_faces.pop();
+            }
+
+            if !valid_faces.is_empty() {
+                let collected : Vec<FaceIndex> =
+                    valid_faces.iter().map(|f|f.face).collect();
+                layers.push((layer_position, collected));
+            }
+        }
+
+        Ok(layers)
+    }
+}
+
+pub struct SliceFaces {
+    pub mesh: TypedTerm<Mesh>,
+    pub layer_faces: TypedTerm<Vec<(f64, Vec<FaceIndex>)>>
+}
+
+impl Expression for SliceFaces {
+    type ValueType = LayerStack;
+    type ErrorType = SlicerError;
+
+    fn terms(&self) -> Terms {
+        vec!(self.mesh.term(), self.layer_faces.term())
+    }
+
+    fn eval(&self) -> SlicerResult<LayerStack> {
+        let layer_faces = &*self.layer_faces;
+        let layer_results : Vec<SlicerResult<Layer>> =
+            layer_faces.iter().map(|l| slice_layer(l.0, &*self.mesh, &l.1)).collect();
 
         let mut layers = Vec::new();
 
