@@ -210,12 +210,16 @@ impl PartialOrd for TopSortedFace {
     }
 }
 
-pub struct SliceMesh {
-    pub mesh: TypedTerm<Mesh>,
-    pub bounds: TypedTerm<Bounds3D>
+pub struct SliceMesh<M, B> {
+    pub mesh: TermResult<M>,
+    pub bounds: TermResult<B>
 }
 
-impl Expression for SliceMesh {
+impl<M, B> Expression for SliceMesh<M, B>
+where
+    M: TypedTerm<ValueType=Mesh>,
+    B: TypedTerm<ValueType=Bounds3D>
+{
     type ValueType = LayerStack;
     type ErrorType = SlicerError;
 
@@ -278,11 +282,13 @@ impl Expression for SliceMesh {
     }
 }
 
-pub struct SortedFaces {
-    pub mesh: TypedTerm<Mesh>
+pub struct SortedFaces<M> {
+    pub mesh: TermResult<M>
 }
 
-impl Expression for SortedFaces {
+impl<M> Expression for SortedFaces<M>
+where M: TypedTerm<ValueType=Mesh>
+{
     type ValueType = Vec<FaceRange>;
     type ErrorType = SlicerError;
 
@@ -301,13 +307,18 @@ impl Expression for SortedFaces {
     }
 }
 
-pub struct LayerFaces {
-    pub mesh: TypedTerm<Mesh>,
-    pub bounds: TypedTerm<Bounds3D>,
-    pub sorted_faces: TypedTerm<Vec<FaceRange>>,
+pub struct LayerFaces<M, B, FR> {
+    pub mesh: TermResult<M>,
+    pub bounds: TermResult<B>,
+    pub sorted_faces: TermResult<FR>
 }
 
-impl Expression for LayerFaces {
+impl<M, B, FR> Expression for LayerFaces<M, B, FR>
+where
+    M: TypedTerm<ValueType=Mesh>,
+    B: TypedTerm<ValueType=Bounds3D>,
+    FR: TypedTerm<ValueType=Vec<FaceRange>>
+{
     type ValueType = Vec<(f64, Vec<FaceIndex>)>;
     type ErrorType = SlicerError;
 
@@ -348,12 +359,16 @@ impl Expression for LayerFaces {
     }
 }
 
-pub struct SliceFaces {
-    pub mesh: TypedTerm<Mesh>,
-    pub layer_faces: TypedTerm<Vec<(f64, Vec<FaceIndex>)>>
+pub struct SliceFaces<M, FI> {
+    pub mesh: TermResult<M>,
+    pub layer_faces: TermResult<FI>
 }
 
-impl Expression for SliceFaces {
+impl<M, FI> Expression for SliceFaces<M, FI>
+where
+    M: TypedTerm<ValueType=Mesh>,
+    FI: TypedTerm<ValueType=Vec<(f64, Vec<FaceIndex>)>>
+{
     type ValueType = LayerStack;
     type ErrorType = SlicerError;
 

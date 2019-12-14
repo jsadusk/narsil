@@ -61,27 +61,27 @@ pub fn run(config : Config) -> Result<(), ExpressionError<NarsilError>> {
 
     let ft = engine.term(model_file::IdentifyModelType { fh: input_fh.try_clone().map_err(|e| ExpressionError::<NarsilError>::Eval(NarsilError::IO(e)))? });
     let free_surface = engine.term(model_file::LoadTriangles{ fh: input_fh.try_clone().map_err(|e| ExpressionError::<NarsilError>::Eval(NarsilError::IO(e)))?,
-                                                         ft: ft });
-    let unified_triangles = engine.term(model_file::UnifyVertices { free_mesh: free_surface });
-    let connected_mesh = engine.term(model_file::ConnectedMesh{ unified_triangles: unified_triangles });
+                                                         ft: ft.into() });
+    let unified_triangles = engine.term(model_file::UnifyVertices { free_mesh: free_surface.into() });
+    let connected_mesh = engine.term(model_file::ConnectedMesh{ unified_triangles: unified_triangles.into() });
 
-    let bounds = engine.term(mesh::MeshBounds { mesh: connected_mesh.clone() });
+    let bounds = engine.term(mesh::MeshBounds { mesh: connected_mesh.clone().into() });
 
-    let sorted_faces = engine.term(slicer::SortedFaces { mesh: connected_mesh.clone() });
+    let sorted_faces = engine.term(slicer::SortedFaces { mesh: connected_mesh.clone().into() });
 
     let layer_faces = engine.term(slicer::LayerFaces {
-        mesh: connected_mesh.clone(),
-        bounds: bounds,
-        sorted_faces: sorted_faces
+        mesh: connected_mesh.clone().into(),
+        bounds: bounds.clone().into(),
+        sorted_faces: sorted_faces.into()
     });
 
-    let slicer = engine.term(slicer::SliceFaces { mesh: connected_mesh, layer_faces: layer_faces });
+    let slicer = engine.term(slicer::SliceFaces { mesh: connected_mesh.into(), layer_faces: layer_faces.into() });
 
     let write_html = engine.term(writers::WriteHtml {
         name: config.name(),
         fh: config.output_fh()?,
-        slices: slicer,
-        bounds: bounds,
+        slices: slicer.into(),
+        bounds: bounds.into(),
         factor: 7.0,
     });
 

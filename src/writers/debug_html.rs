@@ -10,15 +10,19 @@ use svg::node::element::path;
 use crate::slicer::LayerStack;
 use crate::mesh::Bounds3D;
 
-pub struct WriteHtml {
+pub struct WriteHtml<LS, B> {
     pub name: String,
     pub fh: File,
-    pub slices: TypedTerm<LayerStack>,
-    pub bounds: TypedTerm<Bounds3D>,
+    pub slices: TermResult<LS>,
+    pub bounds: TermResult<B>,
     pub factor: f64
 }
 
-impl Expression for WriteHtml {
+impl<LS, B> Expression for WriteHtml<LS, B>
+where
+    LS: TypedTerm<ValueType=LayerStack>,
+    B: TypedTerm<ValueType=Bounds3D>
+{
     type ValueType = ();
     type ErrorType = std::io::Error;
 

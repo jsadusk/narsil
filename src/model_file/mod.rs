@@ -256,12 +256,14 @@ impl Expression for IdentifyModelType {
     }
 }
 
-pub struct LoadTriangles {
+pub struct LoadTriangles<FT> {
     pub fh: File,
-    pub ft: TypedTerm<FileType>
+    pub ft: TermResult<FT>
 }
 
-impl Expression for LoadTriangles {
+impl<FT> Expression for LoadTriangles<FT>
+where FT: TypedTerm<ValueType=FileType>
+{
     type ValueType = FreeSurface;
     type ErrorType = ModelError;
 
@@ -283,11 +285,13 @@ pub struct UnifiedTriangles {
     vertices: Vertices
 }
 
-pub struct UnifyVertices {
-    pub free_mesh: TypedTerm<FreeSurface>
+pub struct UnifyVertices<FM> {
+    pub free_mesh: TermResult<FM>
 }
 
-impl Expression for UnifyVertices {
+impl<FM> Expression for UnifyVertices<FM>
+where FM: TypedTerm<ValueType=FreeSurface>
+{
     type ValueType = UnifiedTriangles;
     type ErrorType = ModelError;
 
@@ -301,11 +305,13 @@ impl Expression for UnifyVertices {
     }
 }
 
-pub struct ConnectedMesh {
-    pub unified_triangles: TypedTerm<UnifiedTriangles>
+pub struct ConnectedMesh<UT> {
+    pub unified_triangles: TermResult<UT>
 }
 
-impl Expression for ConnectedMesh {
+impl<UT> Expression for ConnectedMesh<UT>
+where UT: TypedTerm<ValueType=UnifiedTriangles>
+{
     type ValueType = Mesh;
     type ErrorType = ModelError;
 

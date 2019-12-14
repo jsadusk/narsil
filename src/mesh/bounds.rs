@@ -23,11 +23,13 @@ pub struct Bounds3D {
     pub z : Range
 }
 
-pub struct MeshBounds {
-    pub mesh: TypedTerm<Mesh>
+pub struct MeshBounds<M> {
+    pub mesh: TermResult<M>
 }
 
-impl Expression for MeshBounds {
+impl<M> Expression for MeshBounds<M>
+where M: TypedTerm<ValueType=Mesh>
+{
     type ValueType = Bounds3D;
     type ErrorType = ();
 
