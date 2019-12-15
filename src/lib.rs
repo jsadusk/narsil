@@ -11,6 +11,7 @@ extern crate expression;
 use std::fs::File;
 
 use expression::*;
+use expression::simple_engine::*;
 use std::path::Path as filePath;
 
 mod model_file;
@@ -55,7 +56,7 @@ impl Config {
 
 
 pub fn run(config : Config) -> Result<(), ExpressionError<NarsilError>> {
-    let mut engine = Engine::<NarsilError>::new();
+    let mut engine = SimpleEngine::<NarsilError>::new();
 
     let input_fh = config.input_fh()?;
 
