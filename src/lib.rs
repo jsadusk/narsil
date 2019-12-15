@@ -60,7 +60,7 @@ pub fn run(config : Config) -> Result<(), ExpressionError<NarsilError>> {
     let input_fh = config.input_fh()?;
 
     let ft = engine.term(model_file::IdentifyModelType { fh: input_fh.try_clone().map_err(|e| ExpressionError::<NarsilError>::Eval(NarsilError::IO(e)))? });
-    let free_surface = engine.term(model_file::LoadTriangles{ fh: input_fh.try_clone().map_err(|e| ExpressionError::<NarsilError>::Eval(NarsilError::IO(e)))?,
+    let free_surface = engine.list_term(model_file::LoadTriangles{ fh: input_fh.try_clone().map_err(|e| ExpressionError::<NarsilError>::Eval(NarsilError::IO(e)))?,
                                                          ft: ft.into() });
     let unified_triangles = engine.term(model_file::UnifyVertices { free_mesh: free_surface.into() });
     let connected_mesh = engine.term(model_file::ConnectedMesh{ unified_triangles: unified_triangles.into() });

@@ -261,10 +261,10 @@ pub struct LoadTriangles<FT> {
     pub ft: TermResult<FT>
 }
 
-impl<FT> Expression for LoadTriangles<FT>
+impl<FT> ListExpression for LoadTriangles<FT>
 where FT: TypedTerm<ValueType=FileType>
 {
-    type ValueType = FreeSurface;
+    type ElementType = FreeTriangle;
     type ErrorType = ModelError;
 
     fn terms(&self) -> Terms {
@@ -286,11 +286,13 @@ pub struct UnifiedTriangles {
 }
 
 pub struct UnifyVertices<FM> {
-    pub free_mesh: TermResult<FM>
+    pub free_mesh: TermListResult<FM>
 }
 
 impl<FM> Expression for UnifyVertices<FM>
-where FM: TypedTerm<ValueType=FreeSurface>
+where
+    FM: TypedTerm<ValueType=FreeSurface>,
+    FM: ListTerm<ElementType=FreeTriangle>
 {
     type ValueType = UnifiedTriangles;
     type ErrorType = ModelError;
