@@ -68,15 +68,15 @@ pub fn run(config : Config) -> Result<(), ExpressionError<NarsilError>> {
 
     let bounds = engine.term(mesh::MeshBounds { mesh: connected_mesh.clone().into() });
 
-    let sorted_faces = engine.term(slicer::SortedFaces { mesh: connected_mesh.clone().into() });
+    let sorted_faces = engine.list_term(slicer::SortedFaces { mesh: connected_mesh.clone().into() });
 
-    let layer_faces = engine.term(slicer::LayerFaces {
+    let layer_faces = engine.list_term(slicer::LayerFaces {
         mesh: connected_mesh.clone().into(),
         bounds: bounds.clone().into(),
         sorted_faces: sorted_faces.into()
     });
 
-    let slicer = engine.term(slicer::SliceFaces { mesh: connected_mesh.into(), layer_faces: layer_faces.into() });
+    let slicer = engine.list_term(slicer::SliceFaces { mesh: connected_mesh.into(), layer_faces: layer_faces.into() });
 
     let write_html = engine.term(writers::WriteHtml {
         name: config.name(),

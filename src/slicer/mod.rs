@@ -286,10 +286,10 @@ pub struct SortedFaces<M> {
     pub mesh: TermResult<M>
 }
 
-impl<M> Expression for SortedFaces<M>
+impl<M> ListExpression for SortedFaces<M>
 where M: TypedTerm<ValueType=Mesh>
 {
-    type ValueType = Vec<FaceRange>;
+    type ElementType = FaceRange;
     type ErrorType = SlicerError;
 
     fn terms(&self) -> Terms {
@@ -310,16 +310,16 @@ where M: TypedTerm<ValueType=Mesh>
 pub struct LayerFaces<M, B, FR> {
     pub mesh: TermResult<M>,
     pub bounds: TermResult<B>,
-    pub sorted_faces: TermResult<FR>
+    pub sorted_faces: TermListResult<FR>
 }
 
-impl<M, B, FR> Expression for LayerFaces<M, B, FR>
+impl<M, B, FR> ListExpression for LayerFaces<M, B, FR>
 where
     M: TypedTerm<ValueType=Mesh>,
     B: TypedTerm<ValueType=Bounds3D>,
-    FR: TypedTerm<ValueType=Vec<FaceRange>>
+    FR: ListTerm<ElementType=FaceRange>
 {
-    type ValueType = Vec<(f64, Vec<FaceIndex>)>;
+    type ElementType = (f64, Vec<FaceIndex>);
     type ErrorType = SlicerError;
 
     fn terms(&self) -> Terms {
@@ -361,15 +361,15 @@ where
 
 pub struct SliceFaces<M, FI> {
     pub mesh: TermResult<M>,
-    pub layer_faces: TermResult<FI>
+    pub layer_faces: TermListResult<FI>
 }
 
-impl<M, FI> Expression for SliceFaces<M, FI>
+impl<M, FI> ListExpression for SliceFaces<M, FI>
 where
     M: TypedTerm<ValueType=Mesh>,
-    FI: TypedTerm<ValueType=Vec<(f64, Vec<FaceIndex>)>>
+    FI: ListTerm<ElementType=(f64, Vec<FaceIndex>)>
 {
-    type ValueType = LayerStack;
+    type ElementType = Layer;
     type ErrorType = SlicerError;
 
     fn terms(&self) -> Terms {
@@ -377,9 +377,9 @@ where
     }
 
     fn eval(&self) -> SlicerResult<LayerStack> {
-        let layer_faces = &*self.layer_faces;
+
         let layer_results : Vec<SlicerResult<Layer>> =
-            layer_faces.iter().map(|l| slice_layer(l.0, &*self.mesh, &l.1)).collect();
+            self.layer_faces.iter().map(|l| slice_layer(l.0, &*self.mesh, &l.1)).collect();
 
         let mut layers = Vec::new();
 
