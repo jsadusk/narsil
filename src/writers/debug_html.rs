@@ -1,75 +1,67 @@
 use std::fs::File;
 use std::io::Write;
 
-use expression::*;
-use svg::Document;
-use svg::node::element::Path as svgPath;
-use svg::node::element::Group as svgGroup;
 use svg::node::element::path;
+use svg::node::element::Group as svgGroup;
+use svg::node::element::Path as svgPath;
+use svg::Document;
 
-use crate::slicer::LayerStack;
 use crate::mesh::Bounds3D;
+use crate::slicer::LayerStack;
 
-pub struct WriteHtml<LS, B> {
-    pub name: String,
-    pub fh: File,
-    pub slices: TermResult<LS>,
-    pub bounds: TermResult<B>,
-    pub factor: f64
-}
+pub fn write_html(
+    name: String,
+    fh: &mut File,
+    slices: &LayerStack,
+    bounds: &Bounds3D,
+    factor: f64,
+) -> Result<(), std::io::Error> {
+    let mut document = Document::new()
+        .set(
+            "viewbox",
+            (
+                0,
+                0,
+                (bounds.x.max - bounds.x.min) * factor,
+                (bounds.y.max - bounds.y.min) * factor,
+            ),
+        )
+        .set("id", "layers");
+    for (id, slice) in slices.iter().enumerate() {
+        let mut group = svgGroup::new()
+            .set("id", format!("layer_{}", id))
+            .set("display", "none");
 
-impl<LS, B> Expression for WriteHtml<LS, B>
-where
-    LS: TypedTerm<ValueType=LayerStack>,
-    B: TypedTerm<ValueType=Bounds3D>
-{
-    type ValueType = ();
-    type ErrorType = std::io::Error;
+        for poly in slice.iter() {
+            let mut data = path::Data::new().move_to((
+                (poly[0][0] - bounds.x.min) * factor,
+                (poly[0][1] - bounds.y.min) * factor,
+            ));
 
-    fn terms(&self) -> Terms {
-        vec!(self.slices.term(), self.bounds.term())
-    }
-
-    fn eval(&self) -> Result<(), std::io::Error> {
-        let mut fh = self.fh.try_clone()?;
-
-        let mut document = Document::new()
-            .set("viewbox", (0, 0,
-                             (self.bounds.x.max - self.bounds.x.min)
-                                 * self.factor,
-                             (self.bounds.y.max - self.bounds.y.min)
-                                 * self.factor))
-            .set("id", "layers");
-        for (id, slice) in self.slices.iter().enumerate() {
-            let mut group = svgGroup::new()
-                .set("id", format!("layer_{}", id))
-                .set("display", "none");
-
-            for poly in slice.iter() {
-                let mut data = path::Data::new()
-                    .move_to(((poly[0][0] - self.bounds.x.min) * self.factor,
-                              (poly[0][1] - self.bounds.y.min) * self.factor));
-
-                for point in poly.iter().skip(1) {
-                    data = data.line_to(((point[0] - self.bounds.x.min) * self.factor,
-                                         (point[1] - self.bounds.y.min) * self.factor));
-                }
-
-                data = data.close();
-
-                let path = svgPath::new()
-                    .set("fill", "none")
-                    .set("stroke", "black")
-                    .set("stroke-width", 2)
-                    .set("d", data);
-
-                group = group.add(path);
+            for point in poly.iter().skip(1) {
+                data = data.line_to((
+                    (point[0] - bounds.x.min) * factor,
+                    (point[1] - bounds.y.min) * factor,
+                ));
             }
 
-            document = document.add(group);
+            data = data.close();
+
+            let path = svgPath::new()
+                .set("fill", "none")
+                .set("stroke", "black")
+                .set("stroke-width", 2)
+                .set("d", data);
+
+            group = group.add(path);
         }
 
-        fh.write(format!(r#"
+        document = document.add(group);
+    }
+
+    fh.write(
+        format!(
+            r#"
 <!DOCTYPE html><html><head><title>{}</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
@@ -113,9 +105,16 @@ where
   <input type="range" min="0" max="{}" value="0" class="slider" id="layerSlider">
     <p>Value: <span id="layerId"></span></p>
 </div>
-"#, self.name, self.slices.len() - 1).as_bytes())?;
-        svg::write(&fh, &document)?;
-        fh.write(format!(r#"
+"#,
+            name,
+            slices.len() - 1
+        )
+        .as_bytes(),
+    )?;
+    svg::write(&*fh, &document)?;
+    fh.write(
+        format!(
+            r#"
 <script>
 var slider = document.getElementById("layerSlider");
 var layerSvg = document.getElementById("layers");
@@ -140,8 +139,10 @@ slider.oninput = function() {{
 </script>
 
 </body></html>
-"#, self.slices.len()).as_bytes())?;
-        Ok(())
-
-    }
+"#,
+            slices.len()
+        )
+        .as_bytes(),
+    )?;
+    Ok(())
 }

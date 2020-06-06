@@ -2,7 +2,6 @@ use model_file;
 use slicer;
 use std::error;
 use std::fmt;
-use expression;
 
 #[derive(Debug)]
 pub enum NarsilError {
@@ -18,7 +17,7 @@ impl error::Error for NarsilError {
             Self::Model(e) => Some(e),
             Self::Slicer(e) => Some(e),
             Self::IO(e) => Some(e),
-            Self::Unknown => None
+            Self::Unknown => None,
         }
     }
 }
@@ -27,12 +26,9 @@ impl fmt::Display for NarsilError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Model(e) => write!(f, "Error loading model: {}", e),
-            Self::Slicer(e) =>
-                write!(f, "Error generating slice outlines: {}", e),
-            Self::IO(e) =>
-                write!(f, "{}", e),
-            Self::Unknown =>
-                write!(f, "Unknown error"),
+            Self::Slicer(e) => write!(f, "Error generating slice outlines: {}", e),
+            Self::IO(e) => write!(f, "{}", e),
+            Self::Unknown => write!(f, "Unknown error"),
         }
     }
 }
@@ -60,9 +56,3 @@ impl From<()> for NarsilError {
         Self::Unknown
     }
 }
-impl From<NarsilError> for expression::ExpressionError<NarsilError> {
-    fn from(other: NarsilError) -> Self {
-        Self::Eval(other)
-    }
-}
-

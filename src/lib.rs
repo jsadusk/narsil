@@ -1,42 +1,43 @@
 #[macro_use]
 extern crate lazy_static;
-extern crate regex;
 extern crate byteorder;
 extern crate hedge;
-extern crate svg;
 extern crate quickersort;
 extern crate rayon;
-extern crate expression;
+extern crate regex;
+extern crate svg;
 
 use std::fs::File;
 
-use expression::*;
-use expression::simple_engine::*;
 use std::path::Path as filePath;
 
-mod model_file;
-mod mesh;
-mod slicer;
 mod error;
+mod generator;
+mod mesh;
+mod model_file;
+mod slicer;
 mod writers;
 
 use crate::error::NarsilError;
 
+use crate::generator::*;
 use crate::mesh::*;
+use crate::model_file::*;
 
 pub struct Config {
-    input_filename : String,
-    output_filename : String
+    input_filename: String,
+    output_filename: String,
 }
 
 impl Config {
     pub fn new(args: &Vec<String>) -> Result<Config, String> {
         if args.len() < 3 {
             Err(format!("Usage: {} <input_file> <output_file>", args[0]))
-        }
-        else {
-            Ok(Config { input_filename: args[1].clone(),
-                        output_filename: args[2].clone()})
+        } else {
+            Ok(Config {
+                input_filename: args[1].clone(),
+                output_filename: args[2].clone(),
+            })
         }
     }
 
@@ -54,39 +55,32 @@ impl Config {
     }
 }
 
+pub fn run(config: Config) -> Result<(), NarsilError> {
+    let mut input_fh = config.input_fh()?;
 
-pub fn run(config : Config) -> Result<(), ExpressionError<NarsilError>> {
-    let mut engine = SimpleEngine::<NarsilError>::new();
+    let ft = model_file::identify(&mut input_fh)?;
 
-    let input_fh = config.input_fh()?;
+    let free_surface = model_file::load_triangles(&ft, &mut input_fh)?;
 
-    let ft = engine.term(model_file::IdentifyModelType { fh: input_fh.try_clone().map_err(|e| ExpressionError::<NarsilError>::Eval(NarsilError::IO(e)))? });
-    let free_surface = engine.list_term(model_file::LoadTriangles{ fh: input_fh.try_clone().map_err(|e| ExpressionError::<NarsilError>::Eval(NarsilError::IO(e)))?,
-                                                         ft: ft.into() });
-    let unified_triangles = engine.term(model_file::UnifyVertices { free_mesh: free_surface.into() });
-    let connected_mesh = engine.term(model_file::ConnectedMesh{ unified_triangles: unified_triangles.into() });
+    let (surface, vertices) = model_file::unify_vertices(&free_surface);
 
-    let bounds = engine.term(mesh::MeshBounds { mesh: connected_mesh.clone().into() });
+    let connected_mesh = hedge::Mesh::from_surface(surface, vertices);
 
-    let sorted_faces = engine.list_term(slicer::SortedFaces { mesh: connected_mesh.clone().into() });
+    let bounds = mesh_bounds(&connected_mesh);
 
-    let layer_faces = engine.list_term(slicer::LayerFaces {
-        mesh: connected_mesh.clone().into(),
-        bounds: bounds.clone().into(),
-        sorted_faces: sorted_faces.into()
-    });
+    let sorted_faces = slicer::sort_faces(&connected_mesh);
 
-    let slicer = engine.list_term(slicer::SliceFaces { mesh: connected_mesh.into(), layer_faces: layer_faces.into() });
+    let layer_faces = slicer::layer_faces(&connected_mesh, &bounds, &sorted_faces);
 
-    let write_html = engine.term(writers::WriteHtml {
-        name: config.name(),
-        fh: config.output_fh()?,
-        slices: slicer.into(),
-        bounds: bounds.into(),
-        factor: 7.0,
-    });
+    let slices = slicer::slice_faces(&connected_mesh, &layer_faces)?;
 
-    engine.eval(&write_html)?;
+    let write_html = writers::write_html(
+        config.name(),
+        &mut config.output_fh()?,
+        &slices,
+        &bounds,
+        7.0,
+    )?;
 
     Ok(())
 }

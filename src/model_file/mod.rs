@@ -2,28 +2,26 @@ pub mod ascii_stl;
 pub mod binary_stl;
 pub mod data;
 
-use std::result::Result;
-use std::io::prelude::*;
-use std::fs::File;
-use std::io::SeekFrom;
-use std::io;
-use std::collections::BTreeMap;
+use hedge;
+use hedge::AddGeometry;
+use hedge::Mesh;
+use model_file::data::*;
 use std::cmp::Ordering;
+use std::collections::BTreeMap;
 use std::error;
 use std::fmt;
-use model_file::data::*;
-use hedge;
-use hedge::Mesh;
-use hedge::AddGeometry;
-
-use expression::*;
+use std::fs::File;
+use std::io;
+use std::io::prelude::*;
+use std::io::SeekFrom;
+use std::result::Result;
 
 #[derive(Debug)]
 pub enum ModelError {
     IO(io::Error),
     AsciiParse(ascii_stl::StlError),
     BinaryParse(binary_stl::StlError),
-    Unknown
+    Unknown,
 }
 
 impl error::Error for ModelError {
@@ -32,7 +30,7 @@ impl error::Error for ModelError {
             Self::IO(e) => Some(e),
             Self::AsciiParse(e) => Some(e),
             Self::BinaryParse(e) => Some(e),
-            Self::Unknown => None
+            Self::Unknown => None,
         }
     }
 }
@@ -43,7 +41,7 @@ impl fmt::Display for ModelError {
             Self::IO(e) => write!(f, "{}", e),
             Self::AsciiParse(e) => write!(f, "{}", e),
             Self::BinaryParse(e) => write!(f, "{}", e),
-            Self::Unknown => write!(f, "Unknown file format")
+            Self::Unknown => write!(f, "Unknown file format"),
         }
     }
 }
@@ -68,20 +66,23 @@ impl From<binary_stl::StlError> for ModelError {
 
 type ModelResult<T> = Result<T, ModelError>;
 
-fn dist_sq(a : &Vertex, b : &Vertex) -> f64 {
+fn dist_sq(a: &Vertex, b: &Vertex) -> f64 {
     ((*b)[0] - (*a)[0]).powi(2) + ((*b)[1] - (*a)[1]).powi(2) + ((*b)[2] - (*a)[2]).powi(2)
 }
 
-const EPS_FACTOR : f64 = 0.000001;
+const EPS_FACTOR: f64 = 0.000001;
 
 struct SortableVertex {
-    data : Vertex,
-    epsilon : f64
+    data: Vertex,
+    epsilon: f64,
 }
 
 impl SortableVertex {
     fn new(data: &Vertex, epsilon: f64) -> SortableVertex {
-        SortableVertex { data: [data[0], data[1], data[2]], epsilon }
+        SortableVertex {
+            data: [data[0], data[1], data[2]],
+            epsilon,
+        }
     }
 }
 
@@ -91,8 +92,7 @@ impl Ord for SortableVertex {
             if (self.data[i] - other.data[i]).abs() > self.epsilon {
                 if self.data[i] < other.data[i] {
                     return Ordering::Less;
-                }
-                else {
+                } else {
                     return Ordering::Greater;
                 }
             }
@@ -107,8 +107,7 @@ impl PartialOrd for SortableVertex {
             if (self.data[i] - other.data[i]).abs() > self.epsilon {
                 if self.data[i] < other.data[i] {
                     return Some(Ordering::Less);
-                }
-                else {
+                } else {
                     return Some(Ordering::Greater);
                 }
             }
@@ -130,16 +129,23 @@ impl PartialEq for SortableVertex {
 
 impl Eq for SortableVertex {}
 
-fn unify_vertices(orig : &FreeSurface) -> (Surface, Vertices) {
+pub fn unify_vertices(orig: &FreeSurface) -> (Surface, Vertices) {
     //something to start
     let mut min_edge_len_sq = dist_sq(&orig[0][0], &orig[0][1]);
 
     for (i, triangle) in orig.iter().enumerate() {
         let edge_len_sq = dist_sq(&triangle[0], &triangle[1]);
         if edge_len_sq == 0.0 {
-            panic!("Degenerate 0 {} edge {},{},{} {},{},{}", i,
-                   triangle[0][0], triangle[0][1], triangle[0][2],
-                   triangle[1][0], triangle[1][1], triangle[1][2]);
+            panic!(
+                "Degenerate 0 {} edge {},{},{} {},{},{}",
+                i,
+                triangle[0][0],
+                triangle[0][1],
+                triangle[0][2],
+                triangle[1][0],
+                triangle[1][1],
+                triangle[1][2]
+            );
         }
         if edge_len_sq < min_edge_len_sq {
             min_edge_len_sq = edge_len_sq;
@@ -147,9 +153,16 @@ fn unify_vertices(orig : &FreeSurface) -> (Surface, Vertices) {
 
         let edge_len_sq = dist_sq(&triangle[1], &triangle[2]);
         if edge_len_sq == 0.0 {
-            panic!("Degenerate 1 {} edge {},{},{} {},{},{}", i,
-                   triangle[1][0], triangle[1][1], triangle[1][2],
-                   triangle[2][0], triangle[2][1], triangle[2][2]);
+            panic!(
+                "Degenerate 1 {} edge {},{},{} {},{},{}",
+                i,
+                triangle[1][0],
+                triangle[1][1],
+                triangle[1][2],
+                triangle[2][0],
+                triangle[2][1],
+                triangle[2][2]
+            );
         }
         if edge_len_sq < min_edge_len_sq {
             min_edge_len_sq = edge_len_sq;
@@ -157,9 +170,16 @@ fn unify_vertices(orig : &FreeSurface) -> (Surface, Vertices) {
 
         let edge_len_sq = dist_sq(&triangle[2], &triangle[0]);
         if edge_len_sq == 0.0 {
-            panic!("Degenerate 2 {} edge {},{},{} {},{},{}", i,
-                   triangle[0][0], triangle[0][1], triangle[0][2],
-                   triangle[2][0], triangle[2][1], triangle[2][2]);
+            panic!(
+                "Degenerate 2 {} edge {},{},{} {},{},{}",
+                i,
+                triangle[0][0],
+                triangle[0][1],
+                triangle[0][2],
+                triangle[2][0],
+                triangle[2][1],
+                triangle[2][2]
+            );
         }
         if edge_len_sq < min_edge_len_sq {
             min_edge_len_sq = edge_len_sq;
@@ -192,137 +212,62 @@ fn unify_vertices(orig : &FreeSurface) -> (Surface, Vertices) {
 pub enum FileType {
     Unknown,
     AsciiStl,
-    BinaryStl
+    BinaryStl,
 }
 
-fn identify(fh : &mut File) -> io::Result<FileType> {
+pub fn identify(fh: &mut File) -> io::Result<FileType> {
     let mut buffer = [0u8; 6];
     let num = fh.read(&mut buffer)?;
 
     fh.seek(SeekFrom::Start(0))?;
 
     if num != 6 {
-        return Ok(FileType::Unknown)
+        return Ok(FileType::Unknown);
     }
 
-    if buffer.iter().zip(b"solid".iter()).all(|(a,b)| a == b) {
-        return Ok(FileType::AsciiStl)
-    }
-    else {
-        return Ok(FileType::BinaryStl)
+    if buffer.iter().zip(b"solid".iter()).all(|(a, b)| a == b) {
+        return Ok(FileType::AsciiStl);
+    } else {
+        return Ok(FileType::BinaryStl);
     }
 }
 
-trait FromSurface {
-    fn from_surface(surface : Surface, vertices : Vertices) -> Self;
+pub trait FromSurface {
+    fn from_surface(surface: Surface, vertices: Vertices) -> Self;
 }
 
 impl FromSurface for Mesh {
-    fn from_surface(surface : Surface, vertices : Vertices) -> Self {
+    fn from_surface(surface: Surface, vertices: Vertices) -> Self {
         let mut mesh = Mesh::new();
 
         let mut vert_indices = Vec::new();
 
-        for mesh_vert in vertices.iter().map(
-            |vert| hedge::Vertex::from_point(hedge::Point {x : vert[0],
-                                                           y : vert[1],
-                                                           z : vert[2]})) {
+        for mesh_vert in vertices.iter().map(|vert| {
+            hedge::Vertex::from_point(hedge::Point {
+                x: vert[0],
+                y: vert[1],
+                z: vert[2],
+            })
+        }) {
             vert_indices.push(mesh.add(mesh_vert));
         }
 
         for triangle in surface {
-            mesh.add(hedge::triangle::FromVerts(vert_indices[triangle[0]],
-                                                vert_indices[triangle[1]],
-                                                vert_indices[triangle[2]]));
+            mesh.add(hedge::triangle::FromVerts(
+                vert_indices[triangle[0]],
+                vert_indices[triangle[1]],
+                vert_indices[triangle[2]],
+            ));
         }
 
         mesh
     }
 }
 
-pub struct IdentifyModelType {
-    pub fh: File
-}
-
-impl Expression for IdentifyModelType {
-    type ValueType = FileType;
-    type ErrorType = ModelError;
-
-    fn terms(&self) -> Terms { Terms::new() }
-
-    fn eval(&self) -> ModelResult<FileType> {
-        let mut fh = self.fh.try_clone()?;
-        identify(&mut fh).map_err(|e| ModelError::IO(e))
+pub fn load_triangles(ft: &FileType, fh: &File) -> ModelResult<FreeSurface> {
+    match ft {
+        FileType::AsciiStl => ascii_stl::load(fh).map_err(|e| e.into()),
+        FileType::BinaryStl => binary_stl::load(fh).map_err(|e| e.into()),
+        FileType::Unknown => return Err(ModelError::Unknown),
     }
 }
-
-pub struct LoadTriangles<FT> {
-    pub fh: File,
-    pub ft: TermResult<FT>
-}
-
-impl<FT> ListExpression for LoadTriangles<FT>
-where FT: TypedTerm<ValueType=FileType>
-{
-    type ElementType = FreeTriangle;
-    type ErrorType = ModelError;
-
-    fn terms(&self) -> Terms {
-        vec!(self.ft.term())
-    }
-
-    fn eval(&self) -> ModelResult<FreeSurface> {
-        match *self.ft {
-            FileType::AsciiStl => ascii_stl::load(&self.fh).map_err(|e| e.into()),
-            FileType::BinaryStl => binary_stl::load(&self.fh).map_err(|e| e.into()),
-            FileType::Unknown => return Err(ModelError::Unknown)
-        }
-    }
-}
-
-pub struct UnifiedTriangles {
-    surface: Surface,
-    vertices: Vertices
-}
-
-pub struct UnifyVertices<FM> {
-    pub free_mesh: TermListResult<FM>
-}
-
-impl<FM> Expression for UnifyVertices<FM>
-where
-    FM: TypedTerm<ValueType=FreeSurface>,
-    FM: ListTerm<ElementType=FreeTriangle>
-{
-    type ValueType = UnifiedTriangles;
-    type ErrorType = ModelError;
-
-    fn terms(&self) -> Terms {
-        vec!(self.free_mesh.term())
-    }
-
-    fn eval(&self) -> ModelResult<UnifiedTriangles> {
-        let (surface, vertices) = unify_vertices(&*self.free_mesh);
-        Ok(UnifiedTriangles { surface: surface, vertices: vertices })
-    }
-}
-
-pub struct ConnectedMesh<UT> {
-    pub unified_triangles: TermResult<UT>
-}
-
-impl<UT> Expression for ConnectedMesh<UT>
-where UT: TypedTerm<ValueType=UnifiedTriangles>
-{
-    type ValueType = Mesh;
-    type ErrorType = ModelError;
-
-    fn terms(&self) -> Terms {
-        vec!(self.unified_triangles.term())
-    }
-
-    fn eval(&self) -> ModelResult<Mesh> {
-        Ok(Mesh::from_surface(self.unified_triangles.surface.clone(), self.unified_triangles.vertices.clone()))
-    }
-}
-
