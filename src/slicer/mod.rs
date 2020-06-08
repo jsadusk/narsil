@@ -246,11 +246,7 @@ pub fn sort_faces(mesh: &hedge::Mesh) -> Vec<FaceRange> {
     bottom_sorted
 }
 
-pub fn layer_faces(
-    mesh: &hedge::Mesh,
-    bounds: &Bounds3D,
-    sorted_faces: &Vec<FaceRange>,
-) -> Vec<(f64, Vec<FaceIndex>)> {
+pub fn layer_faces(bounds: &Bounds3D, sorted_faces: &Vec<FaceRange>) -> Vec<(f64, Vec<FaceIndex>)> {
     let layer_height = 0.2;
 
     let max_z = bounds.z.max;

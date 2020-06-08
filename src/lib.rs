@@ -70,11 +70,11 @@ pub fn run(config: Config) -> Result<(), NarsilError> {
 
     let sorted_faces = slicer::sort_faces(&connected_mesh);
 
-    let layer_faces = slicer::layer_faces(&connected_mesh, &bounds, &sorted_faces);
+    let layer_faces = slicer::layer_faces(&bounds, &sorted_faces);
 
     let slices = slicer::slice_faces(&connected_mesh, &layer_faces)?;
 
-    let write_html = writers::write_html(
+    writers::write_html(
         config.name(),
         &mut config.output_fh()?,
         &slices,
