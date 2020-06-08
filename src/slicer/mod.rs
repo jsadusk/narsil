@@ -36,7 +36,7 @@ impl fmt::Display for SlicerError {
     }
 }
 
-type SlicerResult<T> = Result<T, SlicerError>;
+pub type SlicerResult<T> = Result<T, SlicerError>;
 
 struct FaceAttrib {
     seen: bool,
@@ -159,7 +159,7 @@ fn slice_face(position: f64, mesh: &Mesh, face_index: &FaceIndex) -> (Segment, F
     (seg, next)
 }
 
-fn slice_layer(position: f64, mesh: &Mesh, starting_faces: &FaceList) -> SlicerResult<Layer> {
+pub fn slice_layer(position: f64, mesh: &Mesh, starting_faces: &FaceList) -> SlicerResult<Layer> {
     //println!("Starting layer {}", position);
     let mut attrib = HashMap::new();
     for face in starting_faces.iter() {
@@ -284,16 +284,8 @@ pub fn slice_faces(
     mesh: &hedge::Mesh,
     layer_faces: &Vec<(f64, Vec<FaceIndex>)>,
 ) -> SlicerResult<LayerStack> {
-    let layer_results: Vec<SlicerResult<Layer>> = layer_faces
+    layer_faces
         .par_iter()
         .map(|l| slice_layer(l.0, mesh, &l.1))
-        .collect();
-
-    let mut layers = Vec::new();
-
-    for layer_result in layer_results {
-        layers.push(layer_result?);
-    }
-
-    Ok(layers)
+        .collect()
 }

@@ -23,6 +23,7 @@ use crate::error::NarsilError;
 use crate::generator::*;
 use crate::mesh::*;
 use crate::model_file::*;
+use rayon::prelude::*;
 
 pub struct Config {
     input_filename: String,
@@ -72,7 +73,10 @@ pub fn run(config: Config) -> Result<(), NarsilError> {
 
     let layer_faces = slicer::layer_faces(&bounds, &sorted_faces);
 
-    let slices = slicer::slice_faces(&connected_mesh, &layer_faces)?;
+    let slices = layer_faces
+        .par_iter()
+        .map(|l| slicer::slice_layer(l.0, &connected_mesh, &l.1))
+        .collect::<slicer::SlicerResult<Vec<slicer::Layer>>>()?;
 
     writers::write_html(
         config.name(),
