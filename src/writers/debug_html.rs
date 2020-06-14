@@ -8,6 +8,8 @@ use svg::Document;
 
 use crate::mesh::Bounds3D;
 use crate::slicer::LayerStack;
+use geo::line_string;
+use types::*;
 
 pub fn write_html(
     name: String,
@@ -32,16 +34,16 @@ pub fn write_html(
             .set("id", format!("layer_{}", id))
             .set("display", "none");
 
-        for poly in slice.iter() {
+        for poly in slice.0.iter() {
             let mut data = path::Data::new().move_to((
-                (poly[0][0] - bounds.x.min) * factor,
-                (poly[0][1] - bounds.y.min) * factor,
+                (poly[0].x - bounds.x.min) * factor,
+                (poly[0].y - bounds.y.min) * factor,
             ));
 
-            for point in poly.iter().skip(1) {
+            for point in poly.0.iter().skip(1) {
                 data = data.line_to((
-                    (point[0] - bounds.x.min) * factor,
-                    (point[1] - bounds.y.min) * factor,
+                    (point.x - bounds.x.min) * factor,
+                    (point.y - bounds.y.min) * factor,
                 ));
             }
 

@@ -1,3 +1,4 @@
+
 [package]
 name = "narsil"
 version = "0.1.0"
@@ -11,3 +12,6 @@ hedge = { git = "ssh://git@sadusk.com/joe/hedge", branch = "hashable_index" }
 svg = "0.5"
 quickersort = "3.0"
 rayon = "1.0"
+geo = "0.13.0"
+geo-booleanop = "0.2.1"
+geo-offset = "0.1.0"

@@ -1,6 +1,8 @@
 #[macro_use]
 extern crate lazy_static;
 extern crate byteorder;
+extern crate geo;
+extern crate geo_booleanop;
 extern crate hedge;
 extern crate quickersort;
 extern crate rayon;
@@ -16,6 +18,7 @@ mod generator;
 mod mesh;
 mod model_file;
 mod slicer;
+mod types;
 mod writers;
 
 use crate::error::NarsilError;
@@ -23,6 +26,7 @@ use crate::error::NarsilError;
 use crate::generator::*;
 use crate::mesh::*;
 use crate::model_file::*;
+use geo::prelude::*;
 use rayon::prelude::*;
 
 pub struct Config {
@@ -76,6 +80,7 @@ pub fn run(config: Config) -> Result<(), NarsilError> {
     let slices = layer_faces
         .par_iter()
         .map(|l| slicer::slice_layer(l.0, &connected_mesh, &l.1))
+        .map(|l| Ok(l?.simplify(&0.0001)))
         .collect::<slicer::SlicerResult<Vec<slicer::Layer>>>()?;
 
     writers::write_html(

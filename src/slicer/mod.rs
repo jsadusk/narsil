@@ -1,7 +1,6 @@
 use hedge::Face;
 use hedge::FaceIndex;
 use hedge::Mesh;
-use hedge::Point;
 use quickersort;
 use rayon::prelude::*;
 use std::cmp::Eq;
@@ -14,6 +13,7 @@ use std::f64;
 use std::fmt;
 
 use crate::mesh::{Bounds3D, Range};
+use crate::types::*;
 
 #[derive(Debug)]
 pub enum SlicerError {
@@ -69,25 +69,16 @@ fn z_range(mesh: &Mesh, face: &Face) -> Range {
     Range { min, max }
 }
 
-pub type Polygon = Vec<Point>;
-pub type Layer = Vec<Polygon>;
+pub type Layer = MultiLineString;
 pub type LayerStack = Vec<Layer>;
-struct Segment(Point, Point);
+struct Segment(Coordinate, Coordinate);
 type FaceList = Vec<FaceIndex>;
 
 impl Segment {
     fn new() -> Self {
         Segment(
-            Point {
-                x: 0.0,
-                y: 0.0,
-                z: 0.0,
-            },
-            Point {
-                x: 0.0,
-                y: 0.0,
-                z: 0.0,
-            },
+            geo::Coordinate { x: 0.0, y: 0.0 },
+            geo::Coordinate { x: 0.0, y: 0.0 },
         )
     }
 }
@@ -128,10 +119,9 @@ fn slice_face(position: f64, mesh: &Mesh, face_index: &FaceIndex) -> (Segment, F
         }
 
         let fraction = (position - bottom[2]) / (top[2] - bottom[2]);
-        let intersect = Point {
+        let intersect = Coordinate {
             x: bottom[0] + (top[0] - bottom[0]) * fraction,
             y: bottom[1] + (top[1] - bottom[1]) * fraction,
-            z: position,
         };
 
         if point1[2] < point2[2] {
@@ -167,7 +157,7 @@ pub fn slice_layer(position: f64, mesh: &Mesh, starting_faces: &FaceList) -> Sli
     }
 
     let mut starting_index: usize = 0;
-    let mut layer = Layer::new();
+    let mut layer = Vec::<LineString>::new();
 
     while starting_index < starting_faces.len() {
         while starting_index < starting_faces.len()
@@ -182,12 +172,12 @@ pub fn slice_layer(position: f64, mesh: &Mesh, starting_faces: &FaceList) -> Sli
             break;
         }
 
-        let mut slice = Polygon::new();
+        let mut points = Vec::new();
         let starting_face = &starting_faces[starting_index];
 
         let (mut seg, mut next_face) = slice_face(position, &mesh, &starting_face);
-        slice.push(seg.0);
-        slice.push(seg.1);
+        points.push(seg.0);
+        points.push(seg.1);
         attrib.get_mut(starting_face).unwrap().seen = true;
 
         while next_face != *starting_face {
@@ -195,8 +185,8 @@ pub fn slice_layer(position: f64, mesh: &Mesh, starting_faces: &FaceList) -> Sli
             let (new_seg, new_next_face) = slice_face(position, &mesh, &cur_face);
             seg = new_seg;
             next_face = new_next_face;
-            if seg.0 == *slice.last().ok_or(SlicerError::NoLastPointInSlice)? {
-                slice.push(seg.1);
+            if seg.0 == *points.last().ok_or(SlicerError::NoLastPointInSlice)? {
+                points.push(seg.1);
             }
             attrib
                 .get_mut(&cur_face)
@@ -204,11 +194,11 @@ pub fn slice_layer(position: f64, mesh: &Mesh, starting_faces: &FaceList) -> Sli
                 .seen = true;
         }
 
-        assert!(slice.first() == slice.last());
-        layer.push(slice);
+        assert!(points.first() == points.last());
+        layer.push(points.into());
     }
 
-    Ok(layer)
+    Ok(layer.into_iter().collect())
 }
 
 #[derive(PartialEq)]
