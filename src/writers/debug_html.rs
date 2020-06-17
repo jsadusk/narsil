@@ -1,3 +1,4 @@
+use rayon::prelude::*;
 use std::fs::File;
 use std::io::Write;
 
@@ -7,14 +8,15 @@ use svg::node::element::Path as svgPath;
 use svg::Document;
 
 use crate::mesh::Bounds3D;
-use crate::slicer::LayerStack;
+use crate::slicer::Layer;
 use geo::line_string;
 use types::*;
 
 pub fn write_html(
     name: String,
     fh: &mut File,
-    slices: &LayerStack,
+    slices: impl Iterator<Item = Layer>,
+    num_slices: i64,
     bounds: &Bounds3D,
     factor: f64,
 ) -> Result<(), std::io::Error> {
@@ -29,7 +31,7 @@ pub fn write_html(
             ),
         )
         .set("id", "layers");
-    for (id, slice) in slices.iter().enumerate() {
+    for (id, slice) in slices.enumerate() {
         let mut group = svgGroup::new()
             .set("id", format!("layer_{}", id))
             .set("display", "none");
@@ -109,7 +111,7 @@ pub fn write_html(
 </div>
 "#,
             name,
-            slices.len() - 1
+            num_slices - 1
         )
         .as_bytes(),
     )?;
@@ -142,7 +144,7 @@ slider.oninput = function() {{
 
 </body></html>
 "#,
-            slices.len()
+            num_slices
         )
         .as_bytes(),
     )?;

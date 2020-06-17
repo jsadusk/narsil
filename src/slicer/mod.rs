@@ -236,9 +236,11 @@ pub fn sort_faces(mesh: &hedge::Mesh) -> Vec<FaceRange> {
     bottom_sorted
 }
 
-pub fn layer_faces(bounds: &Bounds3D, sorted_faces: &Vec<FaceRange>) -> Vec<(f64, Vec<FaceIndex>)> {
-    let layer_height = 0.2;
-
+pub fn layer_faces(
+    layer_height: f64,
+    bounds: &Bounds3D,
+    sorted_faces: &Vec<FaceRange>,
+) -> Vec<(f64, Vec<FaceIndex>)> {
     let max_z = bounds.z.max;
     let num_layers: usize = (max_z / layer_height).round() as usize;
     let mut cur_face_iter = sorted_faces.iter().peekable();

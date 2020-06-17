@@ -15,3 +15,5 @@ rayon = "1.0"
 geo = "0.13.0"
 geo-booleanop = "0.2.1"
 geo-offset = "0.1.0"
+serde = { version = "1.0.111", features = ["derive"] }
+serde_yaml = "0.8.13"

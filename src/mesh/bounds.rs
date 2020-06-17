@@ -8,11 +8,15 @@ pub struct Range {
 }
 
 impl Range {
-    fn new() -> Range {
+    pub fn new() -> Range {
         Range {
             min: f64::INFINITY,
             max: f64::NEG_INFINITY,
         }
+    }
+
+    pub fn len(&self) -> f64 {
+        self.max - self.min
     }
 }
 
