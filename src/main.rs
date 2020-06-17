@@ -1,6 +1,6 @@
 extern crate narsil;
 
-use narsil::Args;
+use narsil::config::Args;
 use std::env;
 use std::process;
 

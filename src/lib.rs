@@ -11,10 +11,7 @@ extern crate serde;
 extern crate serde_yaml;
 extern crate svg;
 
-use std::fs::File;
-use std::io::BufReader;
-use std::path::Path as filePath;
-
+pub mod config;
 mod error;
 mod generator;
 mod mesh;
@@ -23,67 +20,14 @@ mod slicer;
 mod types;
 mod writers;
 
-use crate::error::NarsilError;
+use crate::config::*;
+use crate::error::*;
 
 use crate::generator::*;
 use crate::mesh::*;
 use crate::model_file::*;
 use geo::prelude::*;
 use rayon::prelude::*;
-use serde::{Deserialize, Serialize};
-use serde_yaml::Result as SerdeResult;
-
-pub type NarsilResult<T> = Result<T, NarsilError>;
-
-pub struct Args {
-    config_filename: String,
-    input_filename: String,
-    output_filename: String,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct Config {
-    layer_height: f64,
-    resolution: f64,
-}
-
-impl Args {
-    pub fn new(cmdline: &Vec<String>) -> Result<Args, String> {
-        if cmdline.len() < 4 {
-            Err(format!(
-                "Usage: {} <config_file> <input_file> <output_file>",
-                cmdline[0]
-            ))
-        } else {
-            Ok(Args {
-                config_filename: cmdline[1].clone(),
-                input_filename: cmdline[2].clone(),
-                output_filename: cmdline[3].clone(),
-            })
-        }
-    }
-
-    pub fn config_fh(&self) -> NarsilResult<File> {
-        Ok(File::open(self.config_filename.clone())?)
-    }
-
-    pub fn config(&self) -> NarsilResult<Config> {
-        Ok(serde_yaml::from_reader(BufReader::new(self.config_fh()?))?)
-    }
-
-    pub fn input_fh(&self) -> NarsilResult<File> {
-        Ok(File::open(self.input_filename.clone())?)
-    }
-
-    pub fn output_fh(&self) -> NarsilResult<File> {
-        Ok(File::create(self.output_filename.clone())?)
-    }
-
-    pub fn name(&self) -> String {
-        let path = filePath::new(self.input_filename.as_str());
-        path.file_name().unwrap().to_str().unwrap().to_string()
-    }
-}
 
 pub fn run(args: Args) -> NarsilResult<()> {
     let config = args.config()?;

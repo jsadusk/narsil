@@ -13,6 +13,8 @@ pub enum NarsilError {
     Unknown,
 }
 
+pub type NarsilResult<T> = Result<T, NarsilError>;
+
 impl error::Error for NarsilError {
     fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         match self {
