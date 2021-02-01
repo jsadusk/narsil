@@ -15,9 +15,10 @@ use types::*;
 pub fn write_html(
     name: String,
     fh: &mut File,
-    slices: impl Iterator<Item = Layer>,
+    slices: impl Iterator<Item = Vec<TaggedPath>>,
     num_slices: i64,
     bounds: &Bounds3D,
+    resolution: f64,
     factor: f64,
 ) -> Result<(), std::io::Error> {
     let mut document = Document::new()
@@ -36,30 +37,40 @@ pub fn write_html(
             .set("id", format!("layer_{}", id))
             .set("display", "none");
 
-        for poly in slice.0.iter() {
+        for path in slice.into_iter() {
+            let poly = path.path;
+
             let mut data = path::Data::new().move_to((
-                (poly[0].x - bounds.x.min) * factor,
-                (poly[0].y - bounds.y.min) * factor,
+                (poly.0[0].x as f64 * resolution - bounds.x.min) * factor,
+                (poly.0[0].y as f64 * resolution - bounds.y.min) * factor,
             ));
 
             for point in poly.0.iter().skip(1) {
                 data = data.line_to((
-                    (point.x - bounds.x.min) * factor,
-                    (point.y - bounds.y.min) * factor,
+                    (point.x as f64 * resolution - bounds.x.min) * factor,
+                    (point.y as f64 * resolution - bounds.y.min) * factor,
                 ));
             }
 
             data = data.close();
 
+            let color = match path.tag {
+                PathTag::Region => "black",
+                PathTag::Shell => "red",
+                PathTag::Interior => "yellow",
+                PathTag::Solid => "green",
+                PathTag::Sparse => "blue",
+                PathTag::Unknown => "grey",
+            };
+
             let path = svgPath::new()
                 .set("fill", "none")
-                .set("stroke", "black")
-                .set("stroke-width", 2)
+                .set("stroke", color)
+                .set("stroke-width", 0.2)
                 .set("d", data);
 
             group = group.add(path);
         }
-
         document = document.add(group);
     }
 

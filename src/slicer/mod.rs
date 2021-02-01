@@ -69,9 +69,9 @@ fn z_range(mesh: &Mesh, face: &Face) -> Range {
     Range { min, max }
 }
 
-pub type Layer = MultiLineString;
+pub type Layer = geo::MultiLineString<f64>;
 pub type LayerStack = Vec<Layer>;
-struct Segment(Coordinate, Coordinate);
+struct Segment(geo::Coordinate<f64>, geo::Coordinate<f64>);
 type FaceList = Vec<FaceIndex>;
 
 impl Segment {
@@ -119,7 +119,7 @@ fn slice_face(position: f64, mesh: &Mesh, face_index: &FaceIndex) -> (Segment, F
         }
 
         let fraction = (position - bottom[2]) / (top[2] - bottom[2]);
-        let intersect = Coordinate {
+        let intersect = geo::Coordinate::<f64> {
             x: bottom[0] + (top[0] - bottom[0]) * fraction,
             y: bottom[1] + (top[1] - bottom[1]) * fraction,
         };
@@ -157,7 +157,7 @@ pub fn slice_layer(position: f64, mesh: &Mesh, starting_faces: &FaceList) -> Sli
     }
 
     let mut starting_index: usize = 0;
-    let mut layer = Vec::<LineString>::new();
+    let mut layer = Vec::<geo::LineString<f64>>::new();
 
     while starting_index < starting_faces.len() {
         while starting_index < starting_faces.len()

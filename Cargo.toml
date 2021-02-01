@@ -12,8 +12,14 @@ hedge = { git = "ssh://git@sadusk.com/joe/hedge", branch = "hashable_index" }
 svg = "0.5"
 quickersort = "3.0"
 rayon = "1.0"
-geo = "0.13.0"
-geo-booleanop = "0.2.1"
-geo-offset = "0.1.0"
+geo = "0.16"
+geo-clipper = { path = "../geo-clipper" }
+geo-collate = { git = "ssh://git@github.com/jsadusk/geo-collate" }
+#simple-generator = { git = "ssh://git@github.com/jsadusk/simple-generator" }
+simple-generator = { path = "../simple-generator" }
+geo-svg = { git = "ssh://git@github.com/jsadusk/geo-svg" }
 serde = { version = "1.0.111", features = ["derive"] }
 serde_yaml = "0.8.13"
+
+[profile.release]
+debug = true

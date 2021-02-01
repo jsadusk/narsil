@@ -10,6 +10,7 @@ pub enum NarsilError {
     Slicer(slicer::SlicerError),
     IO(std::io::Error),
     Serialize(serde_yaml::Error),
+    Collate(geo_collate::CollateError),
     Unknown,
 }
 
@@ -22,6 +23,7 @@ impl error::Error for NarsilError {
             Self::Slicer(e) => Some(e),
             Self::IO(e) => Some(e),
             Self::Serialize(e) => Some(e),
+            Self::Collate(e) => Some(e),
             Self::Unknown => None,
         }
     }
@@ -34,6 +36,7 @@ impl fmt::Display for NarsilError {
             Self::Slicer(e) => write!(f, "Error generating slice outlines: {}", e),
             Self::IO(e) => write!(f, "{}", e),
             Self::Serialize(e) => write!(f, "{}", e),
+            Self::Collate(e) => write!(f, "{}", e),
             Self::Unknown => write!(f, "Unknown error"),
         }
     }
@@ -54,6 +57,12 @@ impl From<slicer::SlicerError> for NarsilError {
 impl From<std::io::Error> for NarsilError {
     fn from(other: std::io::Error) -> Self {
         Self::IO(other)
+    }
+}
+
+impl From<geo_collate::CollateError> for NarsilError {
+    fn from(other: geo_collate::CollateError) -> Self {
+        Self::Collate(other)
     }
 }
 

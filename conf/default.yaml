@@ -1,2 +1,15 @@
 layer_height: 0.2
-resolution: 0.0001
+resolution: 0.0000001
+simplify_factor: 0.0001
+num_shells: 3
+nozzle_diameter: 0.4
+shell_overlap: 0.01
+shell_infill_overlap: 0.02
+top_thickness: 0.8
+bottom_thickness: 0.6
+solid_fill_overlap_ratio: 0.1
+solid_fill_initial_angle: 0
+solid_fill_angle_increment: 90
+sparse_fill_density: 0.1
+sparse_fill_initial_angle: 45
+sparse_fill_angle_increment: 90
