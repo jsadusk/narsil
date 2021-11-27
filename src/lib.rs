@@ -1,4 +1,3 @@
-#![feature(try_trait)]
 #![feature(type_alias_impl_trait)]
 #![feature(iterator_fold_self)]
 
@@ -11,6 +10,7 @@ extern crate hedge;
 extern crate quickersort;
 extern crate rayon;
 extern crate regex;
+extern crate rstar;
 extern crate serde;
 extern crate serde_yaml;
 extern crate simple_generator;
@@ -21,6 +21,7 @@ extern crate lazy_static;
 
 mod captures;
 pub mod config;
+mod connect;
 mod error;
 mod generator;
 mod id_factory;

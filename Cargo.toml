@@ -20,6 +20,7 @@ simple-generator = { path = "../simple-generator" }
 geo-svg = { git = "ssh://git@github.com/jsadusk/geo-svg" }
 serde = { version = "1.0.111", features = ["derive"] }
 serde_yaml = "0.8.13"
+rstar = "0.8.2"
 
 [profile.release]
 debug = true
