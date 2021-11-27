@@ -1,11 +1,8 @@
 use crate::captures::*;
-use crate::config::*;
+//use crate::config::*;
 use crate::types::*;
 
 use geo::bounding_rect::*;
-use geo::map_coords::*;
-use geo::rotate::*;
-use geo_clipper::*;
 use simple_generator::Generator;
 use simple_generator::*;
 use std::collections::HashMap;

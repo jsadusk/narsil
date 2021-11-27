@@ -1,4 +1,4 @@
-use hedge::Mesh;
+use hedge;
 use std::f64;
 
 #[derive(Debug, Clone, Copy, PartialEq)]

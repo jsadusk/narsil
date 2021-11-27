@@ -1,3 +1,3 @@
 pub mod bounds;
 
-pub use bounds::*;
+pub use self::bounds::*;

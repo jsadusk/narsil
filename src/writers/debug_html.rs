@@ -1,4 +1,3 @@
-use rayon::prelude::*;
 use std::fs::File;
 use std::io::Write;
 
@@ -8,8 +7,6 @@ use svg::node::element::Path as svgPath;
 use svg::Document;
 
 use crate::mesh::Bounds3D;
-use crate::slicer::Layer;
-use geo::line_string;
 use types::*;
 
 pub fn write_html(

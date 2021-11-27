@@ -2,7 +2,6 @@ use hedge::Face;
 use hedge::FaceIndex;
 use hedge::Mesh;
 use quickersort;
-use rayon::prelude::*;
 use std::cmp::Eq;
 use std::cmp::Ord;
 use std::cmp::Ordering;
@@ -13,7 +12,6 @@ use std::f64;
 use std::fmt;
 
 use crate::mesh::{Bounds3D, Range};
-use crate::types::*;
 
 #[derive(Debug)]
 pub enum SlicerError {
@@ -272,12 +270,3 @@ pub fn layer_faces(
     layers
 }
 
-pub fn slice_faces(
-    mesh: &hedge::Mesh,
-    layer_faces: &Vec<(f64, Vec<FaceIndex>)>,
-) -> SlicerResult<LayerStack> {
-    layer_faces
-        .par_iter()
-        .map(|l| slice_layer(l.0, mesh, &l.1))
-        .collect()
-}

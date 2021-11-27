@@ -1,5 +1,3 @@
-#[macro_use]
-use lazy_static;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 lazy_static! {

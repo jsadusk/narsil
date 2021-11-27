@@ -1,8 +1,8 @@
 use geo;
 
 use crate::id_factory::*;
-use geo_clipper::{ClosedPoly, OwnedPolygon, PolyType, ToOwnedPolygonInt};
-use iter;
+use geo_clipper::{ClosedPoly, OwnedPolygon, ToOwnedPolygonInt};
+use std::iter;
 use std::cmp;
 
 pub type MultiPolygon = geo::MultiPolygon<i64>;

@@ -4,7 +4,7 @@ use crate::infill::*;
 use crate::types::*;
 use geo::MultiLineString;
 use geo_clipper::*;
-use iter;
+use std::iter;
 use simple_generator::Generator;
 use simple_generator::*;
 use std::collections::VecDeque;
@@ -97,7 +97,7 @@ pub fn solid_grouping_gen<'a>(
         let mut top_accum = VecDeque::<&'a MultiPolygon>::with_capacity(num_top_layers);
         let mut bottom_accum = VecDeque::<&'a MultiPolygon>::with_capacity(num_bottom_layers);
 
-        for i in 0..(num_top_layers - 1) {
+        for _ in 0..(num_top_layers - 1) {
             match cur_top.next() {
                 Some(next_top) => top_accum.push_back(next_top),
                 None => break,
