@@ -2,137 +2,14 @@ use geo;
 
 use crate::id_factory::*;
 use geo_clipper::{ClosedPoly, OwnedPolygon, ToOwnedPolygonInt};
-use std::iter;
 use std::cmp;
+use types::traits::IntoLineStrings;
 
-pub type MultiPolygon = geo::MultiPolygon<i64>;
-pub type Polygon = geo::Polygon<i64>;
-pub type LineString = geo::LineString<i64>;
-pub type MultiLineString = geo::MultiLineString<i64>;
-pub type Point = geo::Point<i64>;
-pub type Coordinate = geo::Coordinate<i64>;
-pub type Line = geo::Line<i64>;
-pub type Rect = geo::Rect<i64>;
-
-pub trait Push {
-    type Item;
-    fn push(&mut self, item: Self::Item);
-}
-
-impl Push for LineString {
-    type Item = Coordinate;
-
-    fn push(&mut self, item: Self::Item) {
-        self.0.push(item);
-    }
-}
-
-impl Push for MultiLineString {
-    type Item = LineString;
-
-    fn push(&mut self, item: Self::Item) {
-        self.0.push(item);
-    }
-}
-
-pub trait IntoLineStrings {
-    type Iter: Iterator<Item = LineString>;
-    fn into_line_strings(self) -> Self::Iter;
-}
-
-impl IntoLineStrings for Polygon {
-    type Iter = std::iter::Chain<
-        std::iter::Once<geo::LineString<i64>>,
-        std::vec::IntoIter<geo::LineString<i64>>,
-    >;
-    fn into_line_strings(self) -> Self::Iter {
-        let (exterior, interior) = self.into_inner();
-        iter::once(exterior).chain(interior.into_iter())
-    }
-}
-
-impl IntoLineStrings for MultiPolygon {
-    type Iter = impl Iterator<Item = LineString>;
-    fn into_line_strings(self) -> Self::Iter {
-        self.0
-            .into_iter()
-            .map(|poly| poly.into_line_strings())
-            .flatten()
-    }
-}
-
-#[inline]
-fn rotate_inner_int(x: i64, y: i64, x0: i64, y0: i64, sin_theta: f64, cos_theta: f64) -> Point {
-    let x = x - x0;
-    let y = y - y0;
-    Point::new(
-        (x as f64 * cos_theta - y as f64 * sin_theta + x0 as f64) as i64,
-        (x as f64 * sin_theta + y as f64 * cos_theta + y0 as f64) as i64,
-    )
-}
-fn rotate_many_int(
-    angle: f64,
-    origin: Point,
-    points: impl Iterator<Item = Point>,
-) -> impl Iterator<Item = Point> {
-    let (sin_theta, cos_theta) = angle.to_radians().sin_cos();
-    let (x0, y0) = origin.x_y();
-    points.map(move |point| rotate_inner_int(point.x(), point.y(), x0, y0, sin_theta, cos_theta))
-}
-
-pub trait IntRotatePoint {
-    fn rotate_around_point(&self, angle: f64, point: Point) -> Self;
-}
-
-impl IntRotatePoint for LineString {
-    fn rotate_around_point(&self, angle: f64, point: Point) -> Self {
-        rotate_many_int(angle, point, self.points_iter()).collect()
-    }
-}
-
-impl IntRotatePoint for MultiLineString {
-    fn rotate_around_point(&self, angle: f64, point: Point) -> Self {
-        self.into_iter()
-            .map(|ls: &LineString| -> LineString {
-                rotate_many_int(angle, point, ls.points_iter()).collect()
-            })
-            .collect()
-    }
-}
+use aliases::*;
 
 pub struct Region {
     pub poly: Polygon,
     pub id: u64,
-}
-
-impl IntoLineStrings for Region {
-    type Iter = impl Iterator<Item = LineString>;
-    fn into_line_strings(self) -> Self::Iter {
-        self.poly.into_line_strings()
-    }
-}
-
-impl From<Polygon> for Region {
-    fn from(poly: Polygon) -> Region {
-        Region {
-            poly,
-            id: get_next_region_id(),
-        }
-    }
-}
-
-pub trait CenterInt {
-    fn center(&self) -> Point;
-}
-
-impl CenterInt for Rect {
-    fn center(&self) -> Point {
-        (
-            (self.max().x + self.min().x) / 2,
-            (self.max().y + self.min().y) / 2,
-        )
-            .into()
-    }
 }
 
 #[derive(PartialEq, Eq)]
@@ -180,6 +57,16 @@ pub type LayerRegions = TaggedRegions<OutlineRegionTag>;
 pub type InteriorRegions = TaggedRegions<InteriorRegionTag>;
 pub type SolidRegions = TaggedRegions<SolidRegionTag>;
 pub type SparseRegions = TaggedRegions<SparseRegionTag>;
+
+
+impl From<Polygon> for Region {
+    fn from(poly: Polygon) -> Region {
+        Region {
+            poly,
+            id: get_next_region_id(),
+        }
+    }
+}
 
 /*impl LayerRegions {
     fn new(regions: Vec<Region>) -> Self {
@@ -360,3 +247,4 @@ pub struct PathGroup<Tag: RegionTag> {
     pub region_id: u64,
     tag: std::marker::PhantomData<Tag>,
 }
+

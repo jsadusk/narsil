@@ -1,6 +1,8 @@
 use crate::captures::*;
 //use crate::config::*;
 use crate::types::*;
+use crate::geometry::linestring_utils::*;
+use crate::geometry::rect_utils::*;
 
 use geo::bounding_rect::*;
 use simple_generator::Generator;
