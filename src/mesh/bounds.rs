@@ -1,5 +1,7 @@
 use hedge;
+use hedge::Mesh;
 use std::f64;
+use hedge::Face;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Range {
@@ -58,3 +60,19 @@ pub fn mesh_bounds(mesh: &hedge::Mesh) -> Bounds3D {
 
     bounds
 }
+
+pub fn z_range(mesh: &Mesh, face: &Face) -> Range {
+    let mut max = f64::NEG_INFINITY;
+    let mut min = f64::INFINITY;
+    for index in mesh.vertices(face) {
+        let point = &mesh.vertex(index).point;
+        if point[2] < min {
+            min = point[2];
+        }
+        if point[2] > max {
+            max = point[2];
+        }
+    }
+    Range { min, max }
+}
+
