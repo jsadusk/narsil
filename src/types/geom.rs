@@ -7,6 +7,7 @@ use types::traits::IntoLineStrings;
 
 use aliases::*;
 
+#[derive(Clone)]
 pub struct Region {
     pub poly: Polygon,
     pub id: u64,
@@ -91,7 +92,36 @@ pub struct Shells {
     pub region_id: u64,
 }
 
+pub struct SingleShell {
+    pub shell: LineString,
+    pub region_id: u64,
+    pub rank: usize,
+}
+
+impl Shells {
+    fn to_single_shells(&self) -> Vec<SingleShell> {
+        self.shells.iter()
+            .enumerate()
+            .map(|(rank, shells)|
+                 shells.iter().map(|shell|
+                            SingleShell {
+                                shell: shell.clone(),
+                                region_id: self.region_id,
+                                rank: rank
+                            }).collect::<Vec<SingleShell>>())
+            .flatten()
+            .collect()
+    }
+}
+                
+
 pub struct LayerShells(pub Vec<Shells>);
+
+impl LayerShells {
+    pub fn to_single_shells(&self) -> Vec<SingleShell> {
+        self.0.iter().map(|shells| shells.to_single_shells()).flatten().collect()
+    }
+}
 
 impl<Tag: RegionTag> ToOwnedPolygonInt for TaggedRegions<Tag> {
     fn to_polygon_owned(&self, poly_type: geo_clipper::PolyType) -> geo_clipper::OwnedPolygon {

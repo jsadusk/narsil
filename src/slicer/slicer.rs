@@ -1,4 +1,3 @@
-use hedge::Face;
 use hedge::FaceIndex;
 use hedge::Mesh;
 use quickersort;
