@@ -245,6 +245,12 @@ impl MyDefault for MultiLineString {
     }
 }
 
+impl MyDefault for LineString {
+    fn default() ->LineString {
+        geo::LineString::<i64>(Vec::new())
+    }
+}
+
 pub trait BoundOps {
     fn bound_sum(&self, other: &Self) -> Self;
 }
